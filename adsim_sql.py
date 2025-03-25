@@ -162,7 +162,7 @@ def save_report(report):
     If the folder doesn't exist, it creates it.
     """
     # Define the folder name
-    reports_folder = Path(r"C:\Users\guilherme.oliveira\Documents\reports")
+    reports_folder = Path("reports")
     
     # Create the folder if it doesn't exist
     reports_folder.mkdir(exist_ok=True)
