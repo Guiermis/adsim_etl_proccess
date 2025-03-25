@@ -24,7 +24,7 @@ Automated ETL pipeline to sync CRM data (deals, clients, sales) with a PostgreSQ
     
     Database	PostgreSQL
 
-    APIs	AdSim CRM API (REST/NDJSON)
+    APIs	        AdSim CRM API (REST/NDJSON)
 
     Scheduling	Cron (Linux) / Task Scheduler (Windows)
     
