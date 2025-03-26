@@ -23,6 +23,7 @@ from pathlib import Path
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from adsim_config import adsim_token, host, port, dbname, user, password
+from adsim_dicts import expected_columns, needed_columns
 import math
 
 engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{dbname}")
@@ -36,100 +37,10 @@ logging.basicConfig(
 )
 
 # Columns expected in the Database
-expected_columns = {
-    "users": ["user_id", "cpf", "name", "login", "lastname", "equipe_id"],
-    "pipeline": ["pipeline_id", "title", "isActive", "isDeleted"],
-    "organization": ["organization_id", "cpf", "cnpj", "name", "isAgency", "registerDate", 
-                     "corporateName", "stateRegistration", "municipalRegistration","company_id", "segment_id", "portfolio_id"],
-    "segments": ["segment_id", "description", "isActive", "isDeleted"],
-    "portfolios": ["portfolio_id", "description", "registerDate", "lastUpdateDate", 
-                   "isActive", "companyId", "startDate", "endDate", "login", "user_id"],
-    "pipelineStep" : ["pipelineStep_id", "title", "goalDeal", "isActive", "goalValue", "isDeleted", "isPlanning", "sequenceOrder"],
-    "company" : ["company_id", "name", "cnpjCpf"],
-    "dealType" : ["dealType_id", "isActive", "description"],
-    "dues" : ["dues_id", "main_id", "company_id", "displayLocation_id", "registerDate", "lastUpdateDate",
-              "value", "channel_id", "dueDate", "netValue", "paymentDate", "product_id", "user_id"],
-    "person" : ["person_id", "cpf", "name"],
-    "historico" : ["main_id", "company_id", "pipelineStep_id", "pipeline_id", "user_id", "id", "enterDate", "value"],
-    "proposals" : ["proposal_id", "registerDate", "lastUpdateDate", "isActive", "version", "isApproved", "isRejected", 
-                   "notes", "isApprovalRequested", "tableValue", "averageDiscountPercentage", "discountPercentage",
-                   "negotiatedValue", "netValue", "deal", "executive", "items", "itemsDigital", "approvalDate", "description",
-                   "title", "rejectionDate", "rejectionReason"],
-    "products" : ["product_id", "product_name"],
-    "gf_deals" : ["id"],
-    "items" : ["id", "startDate", "endDate", "isGroupingProduct", "isWithoutDelivery", "groupIdentifier", "product_id", "product_name", "tableValue",
-               "quantityTotal", "discountPercentage", "negotiatedValue", "productionCostValue", "isProductionCostToDefine", "grossValue", "netValue", "isReapplication"
-               "distributionType", "unitaryValue", "quantity", "channel_id", "channel_name", "channel_initials", "displayLocation_id", "displayLocation_name", 
-               "displayLocation_initals", "program_id", "program_name", "program_initials", "format_id", "format_name", "format_initials", "durationSeconds"],
-    "items_digital" : ["id", "startDate", "endDate", "isGroupingProduct", "isWithoutDelivery", "groupIdentifier", "product_id", "product_name", "tableValue",
-               "quantityTotal", "discountPercentage", "negotiatedValue", "productionCostValue", "isProductionCostToDefine", "grossValue", "netValue", "isReapplication"
-               "distributionType", "unitaryValue", "quantity", "channel_id", "channel_name", "channel_initials","geotarget_name", "geotarget_initials",
-               "website_name", "website_initials", "format_id", "format_id", "device_name", "visibility_name", "costMethod_name", "costMethod_externalCode", "costMethod_calculationStrategy",
-               "isReapplication", "isSponsorship", "page_name", "productToUse_id", "productToUse_name"],
-    "deals" : ["main_id", "isWon", "isLost","endDate", "winDate", "loseDate", "netValue", 
-               "isDeleted", "isPending", "startDate", "shelveDate", "description", "approvalDate","registerDate", "sequenceOrder",
-               "conclusionDate", "lastUpdateDate", "negotiatedValue", "productsQuantity", "forecastSalesDate", "isAdvancedProduct",
-               "activitiesQuantity", "hasProductsWithQuotas", "agencyCommissionPercentage", "company_id", "agencies_id",
-               "person_id", "dealType_id", "products_id", "organization_id", "pipelineStep_id", "responsible_id", "creatorUser_id", "pipeline_id", "conversionDate"],
-    "agencies_emails" : ["emails"],
-    "agencies_phonenumbers" : ["phoneNumbers"],
-    "organization_phonenumbers" : ["phoneNumbers"],
-    "organization_emails" : ["emails"],
-    "gf_executives" : ["id"],
-    "channels" : ["channel_id", "channel_name", "channel_initials"],
-    "digital_products" : ["digital_id", "digital_name", "digital_initials", "channel_id"],
-    "displayLocations" : ["displayLocation_id", "displayLocation_name", "displayLocation_initials"],
-    "formats" : ["format_id", "format_name", "format_initials"]
-}
+expected_columns 
 
 # Columns expected for Data Transformations
-needed_columns = {
-    "users": ["id", "cpf", "name", "login", "lastname"],
-    "pipeline": ["id", "title", "goaldeal", "isactive", "isdeleted"],
-    "organization": ["id", "cpf", "cnpj", "name", "isAgency", "registerDate", 
-                     "corporateName", "stateRegistration", "municipalRegistration", 
-                     "phoneNumbers", "emails", "company", "segments", "customerPortfolios", "notes"],
-    "segments": ["id", "description", "isActive", "isDeleted"],
-    "portfolios": ["id", "description", "registerDate", "lastUpdateDate", 
-                   "isActive", "companyId", "startDate", "endDate", "login", "userFullName"],
-    "pipelineStep" : ["id", "title", "goalDeal", "isActive", "goalValue", "isDeleted", "isPlanning", "sequenceOrder"],
-    "company" : ["id", "name", "cnpjCpf", "logoUrl"],
-    "dealType" : ["id", "isActive", "description", "company"],
-    "dues" : ["id", "main_id", "companyId", "displayLocation_id", "registerDate", "lastUpdateDate",
-              "value", "channel_id", "dueDate", "netValue", "paymentDate", "dealProposalItemId", "product_id"],
-    "person" : ["id", "cpf", "name"],
-    "agencies" : ["id", "cpf", "cnpj", "name", "isagency", "registerDate",
-                  "corporateName", "stateRegistration", "municipalregistration", 
-                  "phoneNumbers", "emails", "company", "segments", "customerPortfolios"],
-    "historico" : ["dealId", "companyId", "pipelineStepId", "pipelineId", "userId", "id", "enterDate", "value"],
-    "proposals" : ["id", "registerDate", "lastUpdateDate", "isActive", "version", "isApproved", "isRejected", 
-                   "notes", "isApprovalRequested", "tableValue", "averageDiscountPercentage", "discountPercentage",
-                   "negotiatedValue", "netValue", "deal", "executive", "items", "itemsDigital", "approvalDate", "description",
-                   "title", "rejectionDate", "rejectionReason"],
-    "products" : ["id", "name"],
-    "gf_deals" : ["id"],
-    "items" : ["id", "startDate", "endDate", "isGroupingProduct", "isWithoutDelivery", "groupIdentifier", "product_id", "product_name", "tableValue",
-               "quantityTotal", "discountPercentage", "negotiatedValue", "productionCostValue", "isProductionCostToDefine", "grossValue", "netValue", "isReapplication"
-               "distributionType", "unitaryValue", "quantity", "channel_id", "channel_name", "channel_initials", "displayLocation_id", "displayLocation_name", 
-               "displayLocation_initials", "program_id", "program_name", "program_initials", "format_id", "format_name", "format_initials", "durationSeconds"],
-    "items_digital" : ["id", "startDate", "endDate", "isGroupingProduct", "isWithoutDelivery", "groupIdentifier", "product_id", "product_name", "tableValue",
-               "quantityTotal", "discountPercentage", "negotiatedValue", "productionCostValue", "isProductionCostToDefine", "grossValue", "netValue", "isReapplication"
-               "distributionType", "unitaryValue", "quantity", "channel_id", "channel_name", "channel_initials","geotarget_name", "geotarget_initials",
-               "website_name", "website_initials", "format_id", "format_id", "device_name", "visibility_name", "costMethod_name", "costMethod_externalCode", "costMethod_calculationStrategy",
-               "isReapplication", "isSponsorship", "page_name", "productToUse_id", "productToUse_name"],
-    "deals" : ["id", "dues", "tags", "isWon", "isLost", "person", "company", "endDate", "winDate", "agencies", "dealType", "loseDate", "netValue", "pipeline", "products", 
-               "isDeleted", "isPending", "startDate", "shelveDate", "description", "approvalDate", "organization", "pipelineStep", "registerDate", "sequenceOrder", "specialFields",
-               "conclusionDate", "lastUpdateDate", "negotiatedValue", "responsibleUser", "productsQuantity", "registeredByUser", "forecastSalesDate", "isAdvancedProduct",
-               "activitiesQuantity", "hasProductsWithQuotas", "agencyCommissionPercentage"],
-    "agencies_emails" : ["emails"],
-    "agencies_phonenumbers" : ["phoneNumbers"],
-    "organization_phonenumbers" : ["phoneNumbers"],
-    "organization_emails" : ["emails"],
-    "gf_executives" : ["id"],
-    "sales" : ['PRAÇA', 'REGIÃO', 'AREA DE NEGÓCIO', 'PRODUTO', 'EXECUTIVO', 'META', 'REALIZADO', 'PORCENTAGEM', 'MÊS/ANO', 'HISTÓRICO 2024', 'VIRADA', 'MÊS ANTERIOR', 'MÊS ATUAL X MÊS ANTERIOR',
-               'CRESCIMENTO 2025X2024', 'ORIGEM', 'NEGÓCIO', 'FONTE DE DADOS', 'PREMIAÇÃO DIRETORIA GERAL', 'PREMIAÇÃO DIRETORIA DE PRAÇA', 'PREMIAÇÃO DIRETORIA NACIONAL', 'PREMIAÇÃO GESTOR DIGITAL',
-               'PREMIAÇÃO INSTITUCIONAL', 'PREMIAÇÃO GERÊNCIA', 'PREMIAÇÃO INDIVIDUAL', 'PREMIAÇÃO HEAD DIGITAL', 'FORECAST 1', 'FORECAST 2', 'ID REMUNERAÇÃO', 'ID POWER BI']
-}
+needed_columns 
 
 # Initialize report
 report = {
@@ -1448,7 +1359,7 @@ def main():
             return pd.DataFrame(dados)
 
         gc = login()
-        timeout_seconds = 35  # Set your desired timeout in seconds
+        timeout_seconds = 35
 
         with futures.ThreadPoolExecutor() as executor:
             future = executor.submit(fetch_sales_data, gc)
@@ -1458,15 +1369,15 @@ def main():
             except futures.TimeoutError:
                 log_error_report(TimeoutError(f"Fetching sales data from Google Sheets timed out after {timeout_seconds} seconds."))
                 log_operation("sales dataframe creation failed due to timeout!", "failed", f"Timeout after {timeout_seconds} seconds")
-                vendas = pd.DataFrame() #or None, depending on your needs
+                vendas = pd.DataFrame() 
             except Exception as e:
                 log_error_report(e)
                 log_operation("sales dataframe creation failed!", "failed", str(e))
-                vendas = pd.DataFrame() #or None, depending on your needs
+                vendas = pd.DataFrame() 
     except Exception as e:
         log_error_report(e)
         log_operation("sales dataframe creation failed!", "failed", str(e))
-        vendas = pd.DataFrame() #or None, depending on your needs
+        vendas = pd.DataFrame() 
 
     #sales tranforming script block
     try:
@@ -1563,8 +1474,8 @@ def main():
 
         vendas = vendas.rename(columns={'PLATAFORMA' : 'channel_name', 'PRAÇA' : 'title'})
 
-        vendas = safe_merge(vendas, channels, id_column=['channel_name'], columns_to_merge=['channel_id'], merge_type='left')
-        vendas = safe_merge(vendas, pipeline, id_column=['title'], columns_to_merge=['pipeline_id'], merge_type='left')
+        vendas = safe_merge(vendas, channels, id_column='channel_name', columns_to_merge=['channel_id'], merge_type='left')
+        vendas = safe_merge(vendas, pipeline, id_column='title', columns_to_merge=['pipeline_id'], merge_type='left')
 
         vendas = drop_columns(vendas, columns_to_drop=['HISTÓRICO 2024', 'VIRADA', 'MÊS ANTERIOR', 'MÊS ATUAL X MÊS ANTERIOR', 
                                     'CRESCIMENTO 2025X2024', 'channel_name', 'title', 'EXECUTIVO', 'PREMIAÇÃO DIRETORIA GERAL', 'PREMIAÇÃO DIRETORIA DE PRAÇA', 
@@ -1584,6 +1495,7 @@ def main():
     #normalization script block
     try:
 
+        #this step will ensure that the expected columns from the database are in the dataframe, if a column is not necessary, it'll drop it.
         users = ensure_columns(users, expected_columns['users'], drop_extra_columns=True)
         pipeline = ensure_columns(pipeline, expected_columns['pipeline'], drop_extra_columns=True)
         segments = ensure_columns(segments, expected_columns['segments'], drop_extra_columns=True)
@@ -1602,6 +1514,7 @@ def main():
         formats = ensure_columns(formats, expected_columns['formats'], drop_extra_columns=True)
         displayLocations = ensure_columns(displayLocations, expected_columns['displayLocations'], drop_extra_columns=True)
 
+        #since we're fetching data from an api, it's best to ensure that values are what the database expects
         df = convert_columns_to_int(df, ['main_id', 'organization_id', 'dealType_id', 'person_id', 'agencies_id', 'products_id', 'pipeline_id', 
                                          'pipelineStep_id', 'creatorUser_id', 'responsible_id', 'company_id', 'activitiesQuantity', 'productsQuantity', 'sequenceOrder', ''])
         users = convert_columns_to_int(users, ['user_id', 'equipe_id'])
@@ -1619,6 +1532,7 @@ def main():
         person = convert_columns_to_int(person, ['person_id'])
         dealType = convert_columns_to_int(dealType, ['dealType_id'])
 
+        #replacing some errors with none
         gf = gf.replace({np.nan : None})
         items = items.replace({np.nan : None})
         dues = dues.replace({np.nan : None})

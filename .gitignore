@@ -29,3 +29,5 @@ rdstation_api
 json_files
 test_files
 .gitignore
+adsim_dicts.py
+__pycache__/adsim_dicts.cpython-311.pyc
