@@ -36,12 +36,6 @@ logging.basicConfig(
     filemode="a",
 )
 
-# Columns expected in the Database
-expected_columns 
-
-# Columns expected for Data Transformations
-needed_columns 
-
 # Initialize report
 report = {
     "status": "success",
