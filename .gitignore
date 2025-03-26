@@ -28,3 +28,4 @@ reports
 rdstation_api
 json_files
 test_files
+.gitignore

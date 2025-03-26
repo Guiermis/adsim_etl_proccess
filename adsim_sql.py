@@ -14,6 +14,7 @@ import logging
 import traceback
 import smtplib
 import gspread
+from concurrent import futures
 from sqlalchemy import create_engine
 from google.oauth2 import service_account
 from openpyxl import load_workbook
@@ -124,7 +125,10 @@ needed_columns = {
     "agencies_phonenumbers" : ["phoneNumbers"],
     "organization_phonenumbers" : ["phoneNumbers"],
     "organization_emails" : ["emails"],
-    "gf_executives" : ["id"]
+    "gf_executives" : ["id"],
+    "sales" : ['PRAÇA', 'REGIÃO', 'AREA DE NEGÓCIO', 'PRODUTO', 'EXECUTIVO', 'META', 'REALIZADO', 'PORCENTAGEM', 'MÊS/ANO', 'HISTÓRICO 2024', 'VIRADA', 'MÊS ANTERIOR', 'MÊS ATUAL X MÊS ANTERIOR',
+               'CRESCIMENTO 2025X2024', 'ORIGEM', 'NEGÓCIO', 'FONTE DE DADOS', 'PREMIAÇÃO DIRETORIA GERAL', 'PREMIAÇÃO DIRETORIA DE PRAÇA', 'PREMIAÇÃO DIRETORIA NACIONAL', 'PREMIAÇÃO GESTOR DIGITAL',
+               'PREMIAÇÃO INSTITUCIONAL', 'PREMIAÇÃO GERÊNCIA', 'PREMIAÇÃO INDIVIDUAL', 'PREMIAÇÃO HEAD DIGITAL', 'FORECAST 1', 'FORECAST 2', 'ID REMUNERAÇÃO', 'ID POWER BI']
 }
 
 # Initialize report
@@ -1436,18 +1440,37 @@ def main():
 
     #sales script block
     try:
+        def fetch_sales_data(gc):
+            """Function to fetch sales data from Google Sheets."""
+            planilha = gc.open("VENDAS 2025 VERSÃO EUA")
+            aba = planilha.worksheet("sheet")
+            dados = aba.get_all_records()
+            return pd.DataFrame(dados)
+
         gc = login()
-        planilha = gc.open("VENDAS 2025 VERSÃO EUA")
-        aba = planilha.worksheet("sheet")
-        dados = aba.get_all_records()
-        vendas = pd.DataFrame(dados)        
-        log_operation("sales dataframe created succesfully!", "success")
+        timeout_seconds = 35  # Set your desired timeout in seconds
+
+        with futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(fetch_sales_data, gc)
+            try:
+                vendas = future.result(timeout=timeout_seconds)
+                log_operation("sales dataframe created succesfully!", "success")
+            except futures.TimeoutError:
+                log_error_report(TimeoutError(f"Fetching sales data from Google Sheets timed out after {timeout_seconds} seconds."))
+                log_operation("sales dataframe creation failed due to timeout!", "failed", f"Timeout after {timeout_seconds} seconds")
+                vendas = pd.DataFrame() #or None, depending on your needs
+            except Exception as e:
+                log_error_report(e)
+                log_operation("sales dataframe creation failed!", "failed", str(e))
+                vendas = pd.DataFrame() #or None, depending on your needs
     except Exception as e:
         log_error_report(e)
         log_operation("sales dataframe creation failed!", "failed", str(e))
+        vendas = pd.DataFrame() #or None, depending on your needs
 
     #sales tranforming script block
     try:
+        vendas = ensure_columns(vendas, needed_columns['sales'], drop_extra_columns=False)
         users['EXECUTIVO'] = users['name'] + ' ' + users['lastname']
         users['EXECUTIVO'] = users['EXECUTIVO'].str.upper()
 
@@ -1540,8 +1563,8 @@ def main():
 
         vendas = vendas.rename(columns={'PLATAFORMA' : 'channel_name', 'PRAÇA' : 'title'})
 
-        vendas = vendas.merge(channels[['channel_name', 'channel_id']], how='left', on='channel_name')
-        vendas = vendas.merge(pipeline[['title','pipeline_id']],how='left',on='title')
+        vendas = safe_merge(vendas, channels, id_column=['channel_name'], columns_to_merge=['channel_id'], merge_type='left')
+        vendas = safe_merge(vendas, pipeline, id_column=['title'], columns_to_merge=['pipeline_id'], merge_type='left')
 
         vendas = drop_columns(vendas, columns_to_drop=['HISTÓRICO 2024', 'VIRADA', 'MÊS ANTERIOR', 'MÊS ATUAL X MÊS ANTERIOR', 
                                     'CRESCIMENTO 2025X2024', 'channel_name', 'title', 'EXECUTIVO', 'PREMIAÇÃO DIRETORIA GERAL', 'PREMIAÇÃO DIRETORIA DE PRAÇA', 
