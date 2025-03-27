@@ -1325,7 +1325,17 @@ def main():
         items = drop_columns(items, columns_to_drop=['items'])
         items_digital = drop_columns(items_digital, columns_to_drop=['itemsDigital'])
 
-        items = pd.concat([items, items_digital], axis=0, ignore_index=True)
+        # Ensure both DataFrames are not empty before concatenation
+        if not items.empty and not items_digital.empty:
+            items = pd.concat([items, items_digital], axis=0, ignore_index=True)
+            log_operation("items and items_digital concatenated successfully.", "success")
+        elif items.empty and not items_digital.empty:
+            items = items_digital.copy()
+            log_operation("items was empty, items_digital copied to items.", "warning")
+        elif not items.empty and items_digital.empty:
+            log_operation("items_digital was empty, keeping only items.", "warning")
+        else:
+            log_operation("Both items and items_digital are empty. Skipping concatenation.", "warning")
 
         agencia_emails = agencia_emails.rename(columns={'agencia_id' : 'organization_id'})
         agencies = agencies.rename(columns={'agencia_id' : 'organization_id'})
