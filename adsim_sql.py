@@ -22,11 +22,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from adsim_config import adsim_token, host, port, dbname, user, password
+from adsim_config import adsim_token, host, port, dbname, user, password, engine
 from adsim_dicts import expected_columns, needed_columns
 import math
-
-engine = create_engine(f"postgresql://{user}:{password}@{host}:{port}/{dbname}")
 
 # Configure logging
 logging.basicConfig(
