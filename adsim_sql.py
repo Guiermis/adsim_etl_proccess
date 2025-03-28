@@ -1515,6 +1515,8 @@ def main():
         items_digital = ensure_columns(items_digital, expected_columns['digital_products'], drop_extra_columns=True)
         formats = ensure_columns(formats, expected_columns['formats'], drop_extra_columns=True)
         displayLocations = ensure_columns(displayLocations, expected_columns['displayLocations'], drop_extra_columns=True)
+        gf = ensure_columns(gf, expected_columns['proposals'], drop_extra_columns=True)
+        items = ensure_columns(items, expected_columns['items'], drop_extra_columns=True)
 
         #since we're fetching data from an api, it's best to ensure that values are what the database expects
         df = convert_columns_to_int(df, ['main_id', 'organization_id', 'dealType_id', 'person_id', 'agencies_id', 'products_id', 'pipeline_id', 
@@ -1533,6 +1535,8 @@ def main():
         pipelineStep = convert_columns_to_int(pipelineStep, ['pipelineStep_id'])
         person = convert_columns_to_int(person, ['person_id'])
         dealType = convert_columns_to_int(dealType, ['dealType_id'])
+        gf = convert_columns_to_int(gf, ['proposal_id', 'main_id', 'executive_id', 'version'])
+        items = convert_columns_to_int(items, ['item_id', 'product_id', 'channel_id', 'main_id', 'groupidentifier', 'product_id', 'quantitytotal', 'channel_id', 'displaylocation_id', 'format_id', 'program_id'])
 
         #replacing some errors with none
         gf = gf.replace({np.nan : None})
@@ -1650,7 +1654,14 @@ def main():
             'netvalue', 'company_id', 'paymentdate', 'registerdate', 'lastupdatedate', 'displaylocation_id'], dues),
         "sales" : ("id", ['regiao', 'area_negocio', 'produto', 'meta', 'realizado', 
             'porcentagem', 'mes_ano', 'origem', 'negocio', 'fonte_dados', 'user_id', 'channel_id', 'pipeline_id'], vendas),
-        "historico" : ("id", ['enterdate', 'pipeline_id', 'pipelinestep_id', 'company_id', 'value', 'main_id'], pf)
+        "historico" : ("id", ['enterdate', 'pipeline_id', 'pipelinestep_id', 'company_id', 'value', 'main_id'], pf),
+        "proposals" : ("proposal_id", ['registerdate', 'lastupdatedate', 'isactive', 'version', 'isapproved', 'isrejected', 'notes', 'isapprovalrequested', 'tablevalue', 'averagediscountpercentage', 
+                                       'negotiatedvalue', 'netvalue', 'discountpercentage', 'approvaldate', 'description', 'title', 'rejectiondate', 'rejectionreason', 'main_id', 'executive_id']),
+        "proposal_items" : ("item_id", ['proposal_id', 'product_id', 'channel_id', 'displaylocation_id', 'program_id', 'format_id', 'isgroupingproduct', 'iswithoutdelivery', 'groupidentifier',
+                                        'unitaryvalue', 'tablevalue', 'quantitytotal', 'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue', 'isproductioncosttodefine',
+                                        'grossvalue', 'netvalue', 'isreapplication', 'distributiontype', 'startdate', 'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
+                                        'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name', 'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
+                                        'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'])
         }
 
         for table_name, (id_column, columns_to_check, df) in table_mappings.items(): 
@@ -1662,8 +1673,6 @@ def main():
             except Exception as e:
                 log_error_report(e)
                 log_operation(f"{table_name} failed fetch from the database.", "failed", str(e))
-
-        #update_deal_and_organization_status(conn)
 
         # Close connection
         cursor.close()
