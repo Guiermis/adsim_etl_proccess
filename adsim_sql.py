@@ -1656,12 +1656,12 @@ def main():
             'porcentagem', 'mes_ano', 'origem', 'negocio', 'fonte_dados', 'user_id', 'channel_id', 'pipeline_id'], vendas),
         "historico" : ("id", ['enterdate', 'pipeline_id', 'pipelinestep_id', 'company_id', 'value', 'main_id'], pf),
         "proposals" : ("proposal_id", ['registerdate', 'lastupdatedate', 'isactive', 'version', 'isapproved', 'isrejected', 'notes', 'isapprovalrequested', 'tablevalue', 'averagediscountpercentage', 
-                                       'negotiatedvalue', 'netvalue', 'discountpercentage', 'approvaldate', 'description', 'title', 'rejectiondate', 'rejectionreason', 'main_id', 'executive_id']),
+                                       'negotiatedvalue', 'netvalue', 'discountpercentage', 'approvaldate', 'description', 'title', 'rejectiondate', 'rejectionreason', 'main_id', 'executive_id'], gf),
         "proposal_items" : ("item_id", ['proposal_id', 'product_id', 'channel_id', 'displaylocation_id', 'program_id', 'format_id', 'isgroupingproduct', 'iswithoutdelivery', 'groupidentifier',
                                         'unitaryvalue', 'tablevalue', 'quantitytotal', 'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue', 'isproductioncosttodefine',
                                         'grossvalue', 'netvalue', 'isreapplication', 'distributiontype', 'startdate', 'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
                                         'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name', 'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
-                                        'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'])
+                                        'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'], items)
         }
 
         for table_name, (id_column, columns_to_check, df) in table_mappings.items(): 
