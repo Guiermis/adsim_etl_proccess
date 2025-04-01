@@ -1673,6 +1673,32 @@ def main():
                 log_error_report(e)
                 log_operation(f"{table_name} failed fetch from the database.", "failed", str(e))
 
+        #block for updating some blank channel_id from dues
+        try:
+            # Step 1: Fetch displaylocation_id and channel_id from the displaylocation table
+            cursor.execute("""
+                SELECT displaylocation_id, channel_id
+                FROM displaylocations;
+            """)
+            displaylocation_data = cursor.fetchall()  # Fetch all rows
+
+            # Step 2: Update the main table with channel_id based on displaylocation_id
+            for displaylocation_id, channel_id in displaylocation_data:
+                cursor.execute("""
+                    UPDATE dues
+                    SET channel_id = %s
+                    WHERE displaylocation_id = %s
+                    AND channel_id IS NULL;
+                """, (channel_id, displaylocation_id))
+
+            # Commit the transaction
+            conn.commit()
+            print("dues updated successfully!")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            conn.rollback()  # Rollback in case of error
+
         # Close connection
         cursor.close()
         conn.close()
