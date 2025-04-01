@@ -1699,6 +1699,7 @@ def main():
             print(f"An error occurred: {e}")
             conn.rollback()  # Rollback in case of error
 
+        #block for updating some blank user_id from dues
         try:
             # Step 1: Fetch main_id and responsible_id from the deals table
             cursor.execute("""
@@ -1723,6 +1724,24 @@ def main():
         except Exception as e:
             print(f"An error occurred: {e}")
             conn.rollback()  # Rollback in case of error
+
+        #bloc for updating channel_id based on the products channel_id column
+        try: 
+            cursor.execute("""
+                UPDATE dues
+                SET channel_id = p.channel_id
+                FROM deals d
+                JOIN products p ON d.product_id = p.product_id
+                WHERE dues.main_id = d.main_id
+                AND dues.channel_id IS NULL;
+            """)
+            conn.commit()
+            print("dues updated successfully!")
+        
+        except Exception as e:
+            print(f"An error ocurred: {e}")
+            conn.rollback()
+
 
         # Close connection
         cursor.close()
