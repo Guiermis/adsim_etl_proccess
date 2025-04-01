@@ -1168,7 +1168,6 @@ def main():
     #excel script block
     try:
         matriz_executivos = pd.read_excel(r'./xlsx_files/matriz_executivos.xlsx')
-
         users = safe_merge(users, matriz_executivos, 'login', 'equipe_id', 'inner')
         users.head()
         log_operation("excel data fetched succesfully!", "success")
