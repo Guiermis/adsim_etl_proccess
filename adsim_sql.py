@@ -1699,6 +1699,31 @@ def main():
             print(f"An error occurred: {e}")
             conn.rollback()  # Rollback in case of error
 
+        try:
+            # Step 1: Fetch main_id and responsible_id from the deals table
+            cursor.execute("""
+                SELECT main_id, responsible_id
+                FROM deals;
+            """)
+            deals_data = cursor.fetchall()  # Fetch all rows
+
+            # Step 2: Update the main table with user_id based on main_id
+            for responsible_id, main_id in deals_data:
+                cursor.execute("""
+                    UPDATE dues
+                    SET user_id = %s
+                    WHERE main_id = %s
+                    AND user_id IS NULL;
+                """, (responsible_id, main_id))
+
+            # Commit the transaction
+            conn.commit()
+            print("dues updated successfully!")
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            conn.rollback()  # Rollback in case of error
+
         # Close connection
         cursor.close()
         conn.close()
