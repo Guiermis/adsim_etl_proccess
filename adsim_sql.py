@@ -1607,8 +1607,8 @@ def main():
         channels.loc[channels['channel_id'] == 934, 'channel_name'] = 'DIGITAL'
         channels.loc[channels['channel_id'] == 934, 'channel_initials'] = 'RCD'
 
-        df.loc[df['islost'] == True, 'pipelineStep_id'] = 61124
-        df.loc[df['islost'] == True, 'sequenceOrder'] = 7
+        df.loc[df['islost'] == True, 'pipelinestep_id'] = 61124
+        df.loc[df['islost'] == True, 'sequenceorder'] = 7
 
         log_operation("dataframe normalized succesfully!", "success")
     except Exception as e:
