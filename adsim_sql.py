@@ -1700,19 +1700,12 @@ def main():
         try:
             # Step 1: Fetch displaylocation_id and channel_id from the displaylocation table
             cursor.execute("""
-                SELECT displaylocation_id, channel_id
-                FROM displaylocations;
+                UPDATE dues
+                SET channel_id = dl.channel_id
+                FROM displaylocations dl
+                WHERE dues.displaylocation_id = dl.displaylocation_id
+                AND dues.channel_id IS NULL;
             """)
-            displaylocation_data = cursor.fetchall()  # Fetch all rows
-
-            # Step 2: Update the main table with channel_id based on displaylocation_id
-            for displaylocation_id, channel_id in displaylocation_data:
-                cursor.execute("""
-                    UPDATE dues
-                    SET channel_id = %s
-                    WHERE displaylocation_id = %s
-                    AND channel_id IS NULL;
-                """, (channel_id, displaylocation_id))
 
             # Commit the transaction
             conn.commit()
