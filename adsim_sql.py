@@ -1696,114 +1696,80 @@ def main():
                 log_operation(f"Error processing table {table_name}.", "failed", str(e))
 
 
-        #block for updating some blank channel_id from dues
-        try:
-            # Step 1: Fetch displaylocation_id and channel_id from the displaylocation table
-            cursor.execute("""
-                UPDATE dues
-                SET channel_id = dl.channel_id
-                FROM displaylocations dl
-                WHERE dues.displaylocation_id = dl.displaylocation_id
-                AND dues.channel_id IS NULL;
-            """)
+            try:
+                # Start a single transaction
+                with conn:
+                    # 1. Update channel_id from displaylocations
+                    cursor.execute("""
+                        UPDATE dues
+                        SET channel_id = dl.channel_id
+                        FROM displaylocations dl
+                        WHERE dues.displaylocation_id = dl.displaylocation_id
+                        AND dues.channel_id IS NULL;
+                    """)
+                    log_operation("Updated channel_id from displaylocations", "success")
 
-            # Commit the transaction
-            conn.commit()
-            log_operation("dues updated successfully!", "success")
-        
-        except Exception as e:
-            log_operation("dues update failed!", "failed", str(e))
-            log_error_report(e)
-            conn.rollback()
+                    # 2. Update user_id from deals
+                    cursor.execute("""
+                        UPDATE dues
+                        SET user_id = deals.responsible_id
+                        FROM deals
+                        WHERE dues.main_id = deals.main_id
+                        AND dues.user_id IS NULL;
+                    """)
+                    log_operation("Updated user_id from deals", "success")
 
-        #block for updating some blank user_id from dues
-        try:
-            # Step 1: Fetch main_id and responsible_id from the deals table
-            cursor.execute("""
-                UPDATE dues
-                SET user_id = deals.responsible_id
-                FROM deals
-                WHERE dues.main_id = deals.main_id
-                AND dues.user_id IS NULL;
-            """)
+                    # 3. Update channel_id from products (via deals)
+                    cursor.execute("""
+                        UPDATE dues
+                        SET channel_id = p.channel_id
+                        FROM deals d
+                        JOIN products p ON d.product_id = p.product_id
+                        WHERE dues.main_id = d.main_id
+                        AND dues.channel_id IS NULL;
+                    """)
+                    log_operation("Updated channel_id from products", "success")
 
-            # Commit the transaction
-            conn.commit()
-            log_operation("dues updated successfully!", "success")
-        
-        except Exception as e:
-            log_operation("dues update failed!", "failed", str(e))
-            log_error_report(e)
-            conn.rollback()
+                    # 4. Update channel_id from proposal_items (exact netvalue match)
+                    cursor.execute("""
+                        UPDATE dues d
+                        SET channel_id = pi.channel_id
+                        FROM (
+                            SELECT 
+                                main_id,
+                                channel_id,
+                                SUM(netvalue) AS total_net_value
+                            FROM 
+                                proposal_items
+                            WHERE
+                                isgroupingproduct = false
+                                AND channel_id IS NOT NULL
+                            GROUP BY 
+                                main_id, channel_id
+                        ) pi
+                        WHERE 
+                            d.main_id = pi.main_id
+                            AND d.netvalue = pi.total_net_value
+                            AND d.channel_id IS NULL;
+                    """)
+                    log_operation("Updated channel_id from proposal_items (exact match)", "success")
 
-        #block for updating channel_id based on the products channel_id column
-        try: 
-            cursor.execute("""
-                UPDATE dues
-                SET channel_id = p.channel_id
-                FROM deals d
-                JOIN products p ON d.product_id = p.product_id
-                WHERE dues.main_id = d.main_id
-                AND dues.channel_id IS NULL;
-            """)
-            conn.commit()
-            log_operation("dues updated successfully!", "success")
-        
-        except Exception as e:
-            log_operation("dues update failed!", "failed", str(e))
-            log_error_report(e)
-            conn.rollback()
+                    # 5. Fallback: Update channel_id from proposal_items (any match)
+                    cursor.execute("""
+                        UPDATE dues d
+                        SET channel_id = p.channel_id
+                        FROM proposal_items pi2
+                        JOIN products p ON pi2.product_id = p.product_id
+                        WHERE d.main_id = pi2.main_id
+                        AND d.channel_id IS NULL
+                        AND pi2.isgroupingproduct = false
+                        AND p.channel_id IS NOT NULL;
+                    """)
+                    log_operation("Updated channel_id from proposal_items (fallback)", "success")
 
-        #bloc for updating channel_id based on the proposals channel_id column
-        try: 
-            cursor.execute("""
-                UPDATE dues d
-                SET channel_id = pi.channel_id
-                FROM (
-                    SELECT 
-                        main_id,
-                        channel_id,
-                        SUM(netvalue) AS total_net_value
-                    FROM 
-                        proposal_items
-                    WHERE
-                        isgroupingproduct = false  -- Only non-grouping products
-                        and channel_id is not null
-                    GROUP BY 
-                        main_id, channel_id
-                ) pi
-                WHERE 
-                    d.main_id = pi.main_id
-                    AND d.netvalue = pi.total_net_value
-                    and d.channel_id is null;
-            """)
-            conn.commit()
-            log_operation("dues updated successfully!", "success")
-        
-        except Exception as e:
-            log_operation("dues update failed!", "failed", str(e))
-            log_error_report(e)
-            conn.rollback()
-
-        #bloc for updating channel_id based on the proposals channel_id column
-        try: 
-            cursor.execute("""
-                UPDATE dues d
-                SET channel_id = p.channel_id
-                FROM proposal_items pi2
-                JOIN products p ON pi2.product_id = p.product_id
-                WHERE d.main_id = pi2.main_id
-                AND d.channel_id IS NULL
-                AND pi2.isgroupingproduct = false
-                AND p.channel_id IS NOT NULL;
-            """)
-            conn.commit()
-            log_operation("dues updated successfully!", "success")
-        
-        except Exception as e:
-            log_operation("dues update failed!", "failed", str(e))
-            log_error_report(e)
-            conn.rollback()
+            except Exception as e:
+                log_operation("Failed to update dues!", "failed", str(e))
+                log_error_report(e)
 
         # Close connection
         cursor.close()
