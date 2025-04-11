@@ -1663,15 +1663,38 @@ def main():
                                         'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'], items)
         }
 
-        for table_name, (id_column, columns_to_check, df) in table_mappings.items(): 
+        for table_name, (id_column, columns_to_check, new_data_df) in table_mappings.items():
             try:
-                sql_data = pd.read_sql_query(f"SELECT * FROM {table_name}", engine)
-                compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, df)
-                log_operation(f"{table_name} fetched from the database successfully!", "success")
-                time.sleep(5)
+                # Check if the new data DataFrame is not empty and the ID column exists
+                if not new_data_df.empty and id_column in new_data_df.columns:
+                    # Get unique, non-null IDs from the new data
+                    ids_to_fetch = new_data_df[id_column].dropna().unique().tolist()
+
+                    # If there are IDs to fetch, query only those rows
+                    if ids_to_fetch:
+                        # Use placeholders for security and efficiency
+                        placeholders = ', '.join(['%s'] * len(ids_to_fetch))
+                        sql_query = f"SELECT * FROM {table_name} WHERE {id_column} IN ({placeholders})"
+                        # Pass the list of IDs as parameters
+                        sql_data = pd.read_sql_query(sql_query, engine, params=tuple(ids_to_fetch))
+                        log_operation(f"Fetched {len(sql_data)} specific rows from {table_name} based on new data IDs.", "success")
+                    else:
+                        # No valid IDs in new data, fetch empty structure from DB
+                        log_operation(f"No valid IDs found in new data for {table_name}. Fetching empty structure.", "info")
+                        sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
+                else:
+                    # New data is empty or ID column missing, fetch empty structure
+                    log_operation(f"New data for {table_name} is empty or missing ID column '{id_column}'. Fetching empty structure.", "info")
+                    sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
+
+                # Proceed with comparison and update
+                compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, new_data_df)
+                time.sleep(2) 
+
             except Exception as e:
                 log_error_report(e)
-                log_operation(f"{table_name} failed fetch from the database.", "failed", str(e))
+                log_operation(f"Error processing table {table_name}.", "failed", str(e))
+
 
         #block for updating some blank channel_id from dues
         try:
@@ -1704,19 +1727,12 @@ def main():
         try:
             # Step 1: Fetch main_id and responsible_id from the deals table
             cursor.execute("""
-                SELECT main_id, responsible_id
-                FROM deals;
+                UPDATE dues
+                SET user_id = deals.responsible_id
+                FROM deals
+                WHERE dues.main_id = deals.main_id
+                AND dues.user_id IS NULL;
             """)
-            deals_data = cursor.fetchall()  # Fetch all rows
-
-            # Step 2: Update the main table with user_id based on main_id
-            for responsible_id, main_id in deals_data:
-                cursor.execute("""
-                    UPDATE dues
-                    SET user_id = %s
-                    WHERE main_id = %s
-                    AND user_id IS NULL;
-                """, (responsible_id, main_id))
 
             # Commit the transaction
             conn.commit()
