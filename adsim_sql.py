@@ -1515,7 +1515,6 @@ def main():
         df = ensure_columns(df, expected_columns['deals'], drop_extra_columns=True)
         organization = ensure_columns(organization, expected_columns['organization'], drop_extra_columns=True)
         channels = ensure_columns(channels, expected_columns['channels'], drop_extra_columns=True)
-        items_digital = ensure_columns(items_digital, expected_columns['digital_products'], drop_extra_columns=True)
         formats = ensure_columns(formats, expected_columns['formats'], drop_extra_columns=True)
         displayLocations = ensure_columns(displayLocations, expected_columns['displayLocations'], drop_extra_columns=True)
         gf = ensure_columns(gf, expected_columns['proposals'], drop_extra_columns=True)
