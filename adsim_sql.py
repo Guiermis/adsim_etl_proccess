@@ -834,7 +834,8 @@ def main():
         users = drop_columns(users, columns_to_drop=['users'])
         users = users.rename(columns={'id': 'user_id'})
 
-        users.head()
+        del creatorUser, responsibleUser
+
         log_operation("users dataframe created successfully!", "success")
     except Exception as e:
         log_error_report(e)
@@ -950,7 +951,7 @@ def main():
         organization = organization.drop_duplicates(subset=['organization_id'])
         organization = organization.dropna(subset=['organization_id'])
 
-        organization.head()
+        del portfolios2, organization2, segments2
 
         log_operation("organization, segments, emails, phone dataframes created succesfully!", "success")
     except Exception as e:
@@ -1169,7 +1170,8 @@ def main():
     try:
         matriz_executivos = pd.read_excel(r'./xlsx_files/matriz_executivos.xlsx')
         users = safe_merge(users, matriz_executivos, 'login', 'equipe_id', 'inner')
-        users.head()
+        
+        del matriz_executivos
         log_operation("excel data fetched succesfully!", "success")
     except Exception as e:
         log_error_report(e)
@@ -1345,6 +1347,8 @@ def main():
         organization = organization.drop_duplicates(subset=['organization_id'])
         organization = organization.loc[:, ~organization.columns.duplicated()]   
         matriz_geotargets.head()
+
+        del agencies, agencia_phoneNumbers, agencia_emails
         log_operation("proposal dataframe cleaned succesfully!", "success")
     except Exception as e:
         log_error_report(e)
@@ -1694,7 +1698,6 @@ def main():
             except Exception as e:
                 log_error_report(e)
                 log_operation(f"Error processing table {table_name}.", "failed", str(e))
-
 
             try:
                 # Start a single transaction
