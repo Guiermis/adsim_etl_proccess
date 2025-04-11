@@ -1699,63 +1699,43 @@ def main():
             try:
                 # Start a single transaction
                 with conn:
-                    # 1. Update channel_id from displaylocations
                     cursor.execute("""
+                        -- Update 1: From displaylocations
                         UPDATE dues
                         SET channel_id = dl.channel_id
                         FROM displaylocations dl
                         WHERE dues.displaylocation_id = dl.displaylocation_id
                         AND dues.channel_id IS NULL;
-                    """)
-                    log_operation("Updated channel_id from displaylocations", "success")
-
-                    # 2. Update user_id from deals
-                    cursor.execute("""
+                        
+                        -- Update 2: From deals
                         UPDATE dues
                         SET user_id = deals.responsible_id
                         FROM deals
                         WHERE dues.main_id = deals.main_id
                         AND dues.user_id IS NULL;
-                    """)
-                    log_operation("Updated user_id from deals", "success")
-
-                    # 3. Update channel_id from products (via deals)
-                    cursor.execute("""
+                        
+                        -- Update 3: From products
                         UPDATE dues
                         SET channel_id = p.channel_id
                         FROM deals d
                         JOIN products p ON d.product_id = p.product_id
                         WHERE dues.main_id = d.main_id
                         AND dues.channel_id IS NULL;
-                    """)
-                    log_operation("Updated channel_id from products", "success")
-
-                    # 4. Update channel_id from proposal_items (exact netvalue match)
-                    cursor.execute("""
+                        
+                        -- Update 4: From proposal_items (exact match)
                         UPDATE dues d
                         SET channel_id = pi.channel_id
                         FROM (
-                            SELECT 
-                                main_id,
-                                channel_id,
-                                SUM(netvalue) AS total_net_value
-                            FROM 
-                                proposal_items
-                            WHERE
-                                isgroupingproduct = false
-                                AND channel_id IS NOT NULL
-                            GROUP BY 
-                                main_id, channel_id
+                            SELECT main_id, channel_id, SUM(netvalue) AS total_net_value
+                            FROM proposal_items
+                            WHERE isgroupingproduct = false AND channel_id IS NOT NULL
+                            GROUP BY main_id, channel_id
                         ) pi
-                        WHERE 
-                            d.main_id = pi.main_id
-                            AND d.netvalue = pi.total_net_value
-                            AND d.channel_id IS NULL;
-                    """)
-                    log_operation("Updated channel_id from proposal_items (exact match)", "success")
-
-                    # 5. Fallback: Update channel_id from proposal_items (any match)
-                    cursor.execute("""
+                        WHERE d.main_id = pi.main_id
+                        AND d.netvalue = pi.total_net_value
+                        AND d.channel_id IS NULL;
+                        
+                        -- Update 5: From proposal_items (fallback)
                         UPDATE dues d
                         SET channel_id = p.channel_id
                         FROM proposal_items pi2
@@ -1765,7 +1745,7 @@ def main():
                         AND pi2.isgroupingproduct = false
                         AND p.channel_id IS NOT NULL;
                     """)
-                    log_operation("Updated channel_id from proposal_items (fallback)", "success")
+                log_operation("All dues updates completed in single transaction", "success")
 
             except Exception as e:
                 log_operation("Failed to update dues!", "failed", str(e))
