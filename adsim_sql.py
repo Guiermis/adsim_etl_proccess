@@ -99,6 +99,7 @@ deals_url = f"https://api.adsim.co/crm-r/api/v2/deals?start={start_date}&end={en
 logs_url = f'https://api.adsim.co/crm-r/api/v2/deals/steps/logs?enterDateStart={logs_end_str}'
 proposals_url = f'https://api.adsim.co/crm-r/api/v2/deals/proposals?start={start_date}&end={end_date}'
 organization_url = f"https://api.adsim.co/crm-r/api/v2/entities?start={start_date}&end={end_date}"
+activities_url = f"https://api.adsim.co/crm-r/api/v2/activity?start={start_date}"
 
 headers = {
     "authorization" : f"Bearer {adsim_token}",
@@ -1354,6 +1355,64 @@ def main():
         log_error_report(e)
         log_operation("proposal dataframe cleaning failed!", "failed", str(e))
 
+    #activities script block
+    try:
+        activities = extract_adsim_data(activities_url)
+        activities = ensure_columns(activities, needed_columns['activities'], drop_extra_columns=False)
+        activities['startDate'] = pd.to_datetime(activities['startDate'])
+        activities['endDate'] = pd.to_datetime(activities['endDate'])
+        activities['doneDate'] = pd.to_datetime(activities['doneDate'])
+
+        activities = activities.rename(columns={'userOwnerId' : 'user_id', 'dealId' : 'main_id'})
+
+        activitiesOrg = pd.json_normalize(activities['organization'])
+        activitiesPers = pd.json_normalize(activities['person'])
+        activitiesComp = pd.json_normalize(activities['company'])
+
+        activitiesOrg = ensure_columns(activitiesOrg, needed_columns['activitiestemp'], drop_extra_columns=False)
+        activitiesPers = ensure_columns(activitiesPers, needed_columns['activitiestemp'], drop_extra_columns=False)
+        activitiesComp = ensure_columns(activitiesComp, needed_columns['activitiestemp'], drop_extra_columns=False)
+
+        activities['organization_id'] = activitiesOrg['id']
+        activities['person_id'] = activitiesPers['id']
+        activities['company_id'] = activitiesComp['id']
+
+        activity_type = pd.json_normalize(activities['type'])
+
+        activities['type_id'] = activity_type['id']
+
+        activity_type = activity_type.drop_duplicates(subset=['id'])
+        activity_type = activity_type.rename(columns={'id' : 'type_id'})
+
+        activities = activities.rename(columns={'id' : 'activity_id'})
+
+        activities_checkin = pd.json_normalize(activities['checkin'])
+        activities_checkin = ensure_columns(activities_checkin, needed_columns['activities_checkin'], drop_extra_columns=False)
+        activities_checkin['activity_id'] = activities['activity_id']
+
+        activities_checkin = activities_checkin.dropna(subset=['date'])
+        activities_checkin['date'] = pd.to_datetime(activities_checkin['date'])
+
+        activities = safe_merge(activities, activities_checkin, 'activity_id', ['date', 'latitude', 'longitude'], 'left')
+
+        activities = activities.rename(columns={'date': 'checkin_date', 'latitude' : 'activity_latitude', 'longitude' : 'activity_longitude'})
+
+        activities = drop_columns(activities, ['type', 'organization', 'person', 'company', 'user', 'checkin'])
+        activity_type = drop_columns(activity_type, ['isActive'])
+
+        activities = activities[
+            activities['main_id'].isin(correct_ids_combined) | 
+            activities['main_id'].isna()
+        ]
+
+        del activities_checkin, activitiesComp, activitiesOrg, activitiesPers
+
+        log_operation("activity and activity type dataframes created succesfully!", "success")
+
+    except Exception as e:
+        log_error_report(e)
+        log_operation("activity and activity type dataframes creation failed!", "failed", str(e))
+
     #sales script block
     try:
         def fetch_sales_data(gc):
@@ -1519,6 +1578,8 @@ def main():
         displayLocations = ensure_columns(displayLocations, expected_columns['displayLocations'], drop_extra_columns=True)
         gf = ensure_columns(gf, expected_columns['proposals'], drop_extra_columns=True)
         items = ensure_columns(items, expected_columns['items'], drop_extra_columns=True)
+        activities = ensure_columns(activities, expected_columns['activities'], drop_extra_columns=True)
+        activity_type = ensure_columns(activity_type, expected_columns['activity_type'], drop_extra_columns=True)
 
         #since we're fetching data from an api, it's best to ensure that values are what the database expects
         df = convert_columns_to_int(df, ['main_id', 'organization_id', 'dealType_id', 'person_id', 'agencies_id', 'products_id', 'pipeline_id', 
@@ -1539,6 +1600,8 @@ def main():
         dealType = convert_columns_to_int(dealType, ['dealType_id'])
         gf = convert_columns_to_int(gf, ['proposal_id', 'main_id', 'executive_id', 'version'])
         items = convert_columns_to_int(items, ['item_id', 'product_id', 'channel_id', 'main_id', 'groupidentifier', 'product_id', 'quantitytotal', 'channel_id', 'displaylocation_id', 'format_id', 'program_id'])
+        activities = convert_columns_to_int(activities, ['main_id', 'activity_id', 'user_id', 'company_id', 'organization_id', 'person_id', 'type_id'])
+        activity_type = convert_columns_to_int(activity_type, ['type_id'])
 
         #replacing some errors with none
         gf = gf.replace({np.nan : None})
@@ -1551,6 +1614,8 @@ def main():
         organization = organization.replace({pd.NA: None, pd.NaT : None})        
         vendas = vendas.replace({pd.NA : None})
         vendas = vendas.replace({'' : None})
+        activities = activities.replace({pd.NA : None})
+        activity_type = activity_type.replace({pd.NA : None})
         organization.loc[organization['isAgency'] == None, 'isAgency'] = False
         organization.loc[organization['municipalRegistration'] == None, 'municipalRegistration'] = False
         organization.loc[organization['stateRegistration'] == None, 'stateRegistration'] = False
@@ -1581,6 +1646,8 @@ def main():
         programs.columns = programs.columns.str.lower()
         formats.columns = formats.columns.str.lower()
         portfolios.columns = portfolios.columns.str.lower()
+        activities.columns = activities.columns.str.lower()
+        activity_type.columns = activity_type.columns.str.lower()
 
         df = df.rename(columns={'products_id' : 'product_id',
                                 'productsquantity' : 'productquantity'})
@@ -1663,7 +1730,10 @@ def main():
                                         'unitaryvalue', 'tablevalue', 'quantitytotal', 'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue', 'isproductioncosttodefine',
                                         'grossvalue', 'netvalue', 'isreapplication', 'distributiontype', 'startdate', 'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
                                         'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name', 'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
-                                        'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'], items)
+                                        'totaltablevalue', 'main_id', 'producttouse_id', 'producttouse_name'], items),
+        "activity_type" : ("type_id", ['description'], activity_type),
+        "activities" : ("activity_id", ['main_id', 'organization_id', 'person_id', 'company_id', 'user_id', 'startdate', 'enddate', 'donedate', 'isdone', 
+                                        'isallday', 'title', 'notes', 'checkin_date', 'checkin_latitude', 'checkin_longitude', 'type_id'], activities)
         }
 
         for table_name, (id_column, columns_to_check, new_data_df) in table_mappings.items():
