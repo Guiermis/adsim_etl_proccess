@@ -1365,9 +1365,9 @@ def main():
 
         activities = activities.rename(columns={'userOwnerId' : 'user_id', 'dealId' : 'main_id'})
 
-        activitiesOrg = pd.json_normalize(activities['organization'])
-        activitiesPers = pd.json_normalize(activities['person'])
-        activitiesComp = pd.json_normalize(activities['company'])
+        activitiesOrg = pd.json_normalize(activities['organization'],sep='_')
+        activitiesPers = pd.json_normalize(activities['person'],sep='_')
+        activitiesComp = pd.json_normalize(activities['company'],sep='_')
 
         activitiesOrg = ensure_columns(activitiesOrg, needed_columns['activitiestemp'], drop_extra_columns=False)
         activitiesPers = ensure_columns(activitiesPers, needed_columns['activitiestemp'], drop_extra_columns=False)
@@ -1377,7 +1377,7 @@ def main():
         activities['person_id'] = activitiesPers['id']
         activities['company_id'] = activitiesComp['id']
 
-        activity_type = pd.json_normalize(activities['type'])
+        activity_type = pd.json_normalize(activities['type'],sep='_')
 
         activities['type_id'] = activity_type['id']
 
@@ -1386,7 +1386,7 @@ def main():
 
         activities = activities.rename(columns={'id' : 'activity_id'})
 
-        activities_checkin = pd.json_normalize(activities['checkin'])
+        activities_checkin = pd.json_normalize(activities['checkin'],sep='_')
         activities_checkin = ensure_columns(activities_checkin, needed_columns['activities_checkin'], drop_extra_columns=False)
         activities_checkin['activity_id'] = activities['activity_id']
 
