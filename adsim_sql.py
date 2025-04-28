@@ -1365,24 +1365,31 @@ def main():
 
         activities = activities.rename(columns={'userOwnerId' : 'user_id', 'dealId' : 'main_id'})
 
-        activitiesOrg = pd.json_normalize(activities['organization'],sep='_')
-        activitiesPers = pd.json_normalize(activities['person'],sep='_')
-        activitiesComp = pd.json_normalize(activities['company'],sep='_')
+        try:
+            activitiesOrg = pd.json_normalize(activities['organization'],sep='_')
+            activitiesPers = pd.json_normalize(activities['person'],sep='_')
+            activitiesComp = pd.json_normalize(activities['company'],sep='_')
+        except Exception as e:
+            log_error_report(e)
 
         activitiesOrg = ensure_columns(activitiesOrg, needed_columns['activitiestemp'], drop_extra_columns=False)
         activitiesPers = ensure_columns(activitiesPers, needed_columns['activitiestemp'], drop_extra_columns=False)
         activitiesComp = ensure_columns(activitiesComp, needed_columns['activitiestemp'], drop_extra_columns=False)
 
-        activities['organization_id'] = activitiesOrg['id']
-        activities['person_id'] = activitiesPers['id']
-        activities['company_id'] = activitiesComp['id']
+        try:
+            activities['organization_id'] = activitiesOrg['id']
+            activities['person_id'] = activitiesPers['id']
+            activities['company_id'] = activitiesComp['id']
 
-        activity_type = pd.json_normalize(activities['type'],sep='_')
+            activity_type = pd.json_normalize(activities['type'],sep='_')
 
-        activities['type_id'] = activity_type['id']
+            activities['type_id'] = activity_type['id']
 
-        activity_type = activity_type.drop_duplicates(subset=['id'])
-        activity_type = activity_type.rename(columns={'id' : 'type_id'})
+            activity_type = activity_type.drop_duplicates(subset=['id'])
+            activity_type = activity_type.rename(columns={'id' : 'type_id'})
+        except Exception as e:
+            log_error_report(e)
+            activity_type = ensure_columns(activity_type, needed_columns['activitiestemp'], drop_extra_columns=False)
 
         activities = activities.rename(columns={'id' : 'activity_id'})
 
