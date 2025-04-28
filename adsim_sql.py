@@ -1371,6 +1371,9 @@ def main():
             activitiesComp = pd.json_normalize(activities['company'],sep='_')
         except Exception as e:
             log_error_report(e)
+            activitiesOrg = pd.DataFrame()
+            activitiesPers = pd.DataFrame()
+            activitiesComp = pd.DataFrame()
 
         activitiesOrg = ensure_columns(activitiesOrg, needed_columns['activitiestemp'], drop_extra_columns=False)
         activitiesPers = ensure_columns(activitiesPers, needed_columns['activitiestemp'], drop_extra_columns=False)
