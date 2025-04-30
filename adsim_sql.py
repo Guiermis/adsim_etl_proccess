@@ -1393,7 +1393,9 @@ def main():
             activity_type = activity_type.rename(columns={'id' : 'type_id'})
         except Exception as e:
             log_error_report(e)
-            activity_type = ensure_columns(activity_type, needed_columns['activitiestemp'], drop_extra_columns=False)
+            activity_type = pd.DataFrame()
+
+        activity_type = ensure_columns(activity_type, needed_columns['activitiestemp'], drop_extra_columns=False)
 
         activities = activities.rename(columns={'id' : 'activity_id'})
 
