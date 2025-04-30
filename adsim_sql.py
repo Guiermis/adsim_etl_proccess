@@ -94,6 +94,7 @@ logs_end_str = logs_end.strftime("%Y-%m-%d")
 
 start = end - timedelta(minutes=45)
 start_date = start.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+logs_start_str = start.strftime("%Y-%m-%d")
 
 deals_url = f"https://api.adsim.co/crm-r/api/v2/deals?start={start_date}&end={end_date}"
 logs_url = f'https://api.adsim.co/crm-r/api/v2/deals/steps/logs?enterDateStart={logs_end_str}'
