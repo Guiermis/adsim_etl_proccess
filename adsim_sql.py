@@ -1,8 +1,6 @@
 import requests as r
 import json
-import pandas as pd
 from datetime import datetime, timedelta, timezone, date
-import numpy as np
 import pandas as pd
 import numpy as np
 import psycopg2
@@ -411,33 +409,79 @@ def compare_and_update_table(cursor, conn, table_name, id_column, columns_to_che
     time.sleep(5)
     update_or_insert_rows(conn,cursor, table_name, id_column, columns_to_check, result["rows_to_update"], result["rows_to_insert"])
 
-def extract_adsim_data(url):
-    # Make the API request
-    response = r.get(url, headers=headers)
+def extract_adsim_data(url, max_retries=3, timeout_seconds=30, retry_delay_seconds=5):
+    """
+    Extracts data from AdSim API with timeout and retry logic.
 
-    # Print the response text and content type for debugging
-    #print(response.text)
-    print(response.headers.get('Content-Type'))
+    Args:
+        url (str): The API endpoint URL.
+        max_retries (int): Maximum number of times to retry the request.
+        timeout_seconds (int): Timeout for the API request in seconds.
+        retry_delay_seconds (int): Delay between retries in seconds.
 
-    # Read the response text
-    ndjson_text = response.text
+    Returns:
+        pd.DataFrame: DataFrame containing the API response data, or an empty DataFrame on failure.
+    """
+    for attempt in range(max_retries):
+        try:
+            # Make the API request with a timeout
+            response = r.get(url, headers=headers, timeout=timeout_seconds)
+            response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
-    # Split the text into individual lines
-    ndjson_lines = ndjson_text.strip().split('\n')
+            # Print the response text and content type for debugging
+            # print(response.text)
+            print(response.headers.get('Content-Type'))
 
-    # Parse each line as a JSON object
-    data_list = []
-    for line in ndjson_lines:
-        if line.strip():  # Skip empty lines
-            try:
-                data_list.append(json.loads(line))
-            except json.JSONDecodeError as e:
-                print(f"JSONDecodeError on line: {line}")
-                print(e)
+            # Read the response text
+            ndjson_text = response.text
 
-    # Convert the list of JSON objects into a DataFrame
-    df = pd.DataFrame(data_list)
-    return df
+            # Split the text into individual lines
+            ndjson_lines = ndjson_text.strip().split('\n')
+
+            # Parse each line as a JSON object
+            data_list = []
+            for line in ndjson_lines:
+                if line.strip():  # Skip empty lines
+                    try:
+                        data_list.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        print(f"JSONDecodeError on line: {line}")
+                        print(e)
+                        log_warning_report(f"JSONDecodeError while parsing API response from {url}", f"Line: {line}, Error: {e}")
+
+
+            # Convert the list of JSON objects into a DataFrame
+            df = pd.DataFrame(data_list)
+            log_operation(f"Successfully fetched data from {url}", "success")
+            return df
+
+        except r.exceptions.Timeout:
+            print(f"Timeout occurred while fetching data from {url} (attempt {attempt + 1}/{max_retries}). Retrying in {retry_delay_seconds}s...")
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay_seconds)
+            else:
+                log_error_report(TimeoutError(f"Failed to fetch data from {url} after {max_retries} attempts due to timeout."))
+                return pd.DataFrame() # Return empty DataFrame after max retries
+
+        except r.exceptions.RequestException as e:
+            log_error_report(e)
+            log_operation(f"Request failed for {url} (attempt {attempt + 1}/{max_retries})", "failed", str(e))
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay_seconds)
+            else:
+                log_error_report(e) # Log final error
+                return pd.DataFrame() # Return empty DataFrame after max retries
+        
+        except Exception as e: # Catch any other unexpected errors
+            log_error_report(e)
+            log_operation(f"An unexpected error occurred while fetching data from {url} (attempt {attempt + 1}/{max_retries})", "failed", str(e))
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay_seconds)
+            else:
+                log_error_report(e) # Log final error
+                return pd.DataFrame() # Return empty DataFrame after max retries
+                
+    return pd.DataFrame() # Should be unreachable if logic is correct, but as a fallback
 
 def ensure_columns(df, required_columns, drop_extra_columns=True):
     """
