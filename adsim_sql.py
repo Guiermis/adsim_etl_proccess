@@ -1734,6 +1734,8 @@ def main():
         df.loc[df['islost'] == True, 'pipelinestep_id'] = 61124
         df.loc[df['islost'] == True, 'sequenceorder'] = 7
 
+        vendas = vendas.dropna(subset=['id'])
+
         log_operation("dataframe normalized succesfully!", "success")
     except Exception as e:
         log_error_report(e)
