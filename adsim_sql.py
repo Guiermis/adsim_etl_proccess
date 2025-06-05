@@ -1875,6 +1875,23 @@ def main():
                         AND d.channel_id IS NULL
                         AND pi2.isgroupingproduct = false
                         AND p.channel_id IS NOT NULL;
+                        
+                        -- Update 6: Delete duplicates (dues)
+                        WITH ranked_duplicates AS (
+                            SELECT *,
+                                ROW_NUMBER() OVER (
+                                    PARTITION BY channel_id, value, duedate, netvalue, paymentdate
+                                    ORDER BY registerdate DESC
+                                ) AS rn
+                            FROM dues
+                        )
+
+                        DELETE FROM dues
+                        WHERE dues_id IN (
+                            SELECT dues_id
+                            FROM ranked_duplicates
+                            WHERE rn > 1
+                        );
                     """)
                 log_operation("All dues updates completed in single transaction", "success")
 
