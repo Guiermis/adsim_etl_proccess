@@ -1574,6 +1574,7 @@ def main():
         dues.loc[dues['channel_id'] == 944, 'channel_id'] = 934
         dues.loc[dues['channel_id'] == 955, 'channel_id'] = 934
         dues.loc[dues['channel_id'] == 484, 'channel_id'] = 941
+        channels.loc[channels['channel_id'] == 941, 'channel_name'] = 'TOPVIEW'
 
         vendas.loc[vendas['PRAÇA'].str.contains('INSTITUC.'), 'PRAÇA'] = 'INSTITUCIONAL'
         vendas.loc[vendas['user_id'] == 24436, 'PRAÇA'] = 'INSTITUCIONAL'
@@ -1584,7 +1585,7 @@ def main():
         vendas.loc[vendas['PLATAFORMA'].str.contains('JOY'), 'PLATAFORMA'] = 'JP CURITIBA'
         vendas.loc[vendas['PLATAFORMA'].str.contains('TV'), 'PLATAFORMA'] = 'RICTV RECORD'
         vendas.loc[vendas['PLATAFORMA'].str.contains('RÁDIO'), 'PLATAFORMA'] = 'JOVEM PAN PR'
-        vendas.loc[vendas['PLATAFORMA'].str.contains('REVISTA'), 'PLATAFORMA'] = 'JOVEM PAN NEWS PR'
+        vendas.loc[vendas['PLATAFORMA'].str.contains('REVISTA'), 'PLATAFORMA'] = 'TOPVIEW'
         vendas.loc[vendas['PLATAFORMA'].str.contains('RICtv'), 'PLATAFORMA'] = 'RICTV RECORD'
         vendas.loc[vendas['PLATAFORMA'].str.contains('JP'), 'PLATAFORMA'] = 'JOVEM PAN PR'
         vendas.loc[vendas['PLATAFORMA'].str.contains('NEWS'), 'PLATAFORMA'] = 'JOVEM PAN NEWS PR'
@@ -1592,8 +1593,7 @@ def main():
 
         vendas['PLATAFORMA'] = vendas['PLATAFORMA'].str.strip()
         channels['channel_name'] = channels['channel_name'].str.strip()
-        channels.loc[channels['channel_id'] == 941, 'channel_name'] = 'TOPVIEW'
-
+        
         vendas = vendas.rename(columns={'PLATAFORMA' : 'channel_name', 'PRAÇA' : 'title'})
 
         vendas = safe_merge(vendas, channels, id_column='channel_name', columns_to_merge=['channel_id'], merge_type='left')
