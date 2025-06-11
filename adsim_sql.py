@@ -1592,6 +1592,7 @@ def main():
 
         vendas['PLATAFORMA'] = vendas['PLATAFORMA'].str.strip()
         channels['channel_name'] = channels['channel_name'].str.strip()
+        channels.loc[channels['channel_id'] == 941, 'channel_name'] = 'TOPVIEW'
 
         vendas = vendas.rename(columns={'PLATAFORMA' : 'channel_name', 'PRAÇA' : 'title'})
 
