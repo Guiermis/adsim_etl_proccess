@@ -1100,7 +1100,6 @@ def main():
 
         dues = dues.rename(columns={'id' : 'dues_id', 'userId' : 'user_id', 'companyId' : 'company_id'})
 
-        dues.head()
         log_operation("dues dataframe created succesfully!", "success")
     except Exception as e:
         log_error_report(e)
