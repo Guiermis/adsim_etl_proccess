@@ -1892,11 +1892,79 @@ def main():
                             FROM ranked_duplicates
                             WHERE rn > 1
                         );
+                                   
+                        DELETE FROM basket_teste;
                     """)
                 log_operation("All dues updates completed in single transaction", "success")
 
             except Exception as e:
                 log_operation("Failed to update dues!", "failed", str(e))
+                log_error_report(e)
+
+            try:
+                #Calculo novo de basket
+                def calculo_novo(dues, items):
+                    soma_veiculo_e_praca = items.groupby(['main_id'], as_index=False).agg(
+                        total_proposal_net_value=('netvalue', 'sum')
+                    )
+
+                    porcentagem = items.drop(['program_id', 'format_id', 'isgroupingproduct', 'iswithoutdelivery', 
+                                            'groupidentifier', 'unitaryvalue', 'tablevalue', 'quantitytotal',
+                                            'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue',
+                                            'isproductioncosttodefine', 'grossvalue', 'isreapplication', 'distributiontype', 'startdate',
+                                            'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
+                                            'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name',
+                                            'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
+                                            'totaltablevalue', 'producttouse_id', 'producttouse_name', 'product_id'], axis=1)
+                    
+                    porcentagem = porcentagem.groupby(['main_id', 'channel_id', 'displaylocation_id'], as_index=False).agg(
+                        channel_netvalue = ('netvalue', 'sum')
+                    )
+                    
+                    porcentagem = pd.merge(porcentagem, soma_veiculo_e_praca, how='left', on='main_id')
+
+                    porcentagem['porcentagem'] = porcentagem['channel_netvalue'] / porcentagem['total_proposal_net_value']
+
+                    dues = dues[dues['main_id'].isin(porcentagem['main_id'])]
+
+                    dues_months = dues.drop(['dues_id', 'company_id', 'value', 'paymentdate', 'registerdate', 'lastupdatedate', 'dealproposalitemid', 'channel_id', 'displaylocation_id'], axis=1)
+
+                    basket_teste = pd.merge(dues_months, porcentagem, how='left', on='main_id')
+
+                    basket_teste = basket_teste.drop(['channel_netvalue', 'total_proposal_net_value'], axis=1)
+
+                    basket_teste['basket_value'] = (
+                        basket_teste['netvalue'] * basket_teste['porcentagem'].fillna(1)
+                    )
+
+                    basket_teste['channel_id'] = basket_teste['channel_id'].astype(int)
+                    basket_teste['displaylocation_id'] = basket_teste['displaylocation_id'].astype(int)
+
+                    basket_teste['basket_id'] = (
+                        basket_teste['main_id'].astype(str) + 
+                        basket_teste['user_id'].astype(str) + 
+                        basket_teste['channel_id'].astype(str) + 
+                        basket_teste['displaylocation_id'].astype(str) + 
+                        basket_teste['duedate'].astype(str)
+                    )
+
+                    basket_teste = basket_teste.drop(['porcentagem', 'netvalue'], axis=1)
+
+                    return basket_teste
+
+                df_teste = calculo_novo(dues, items)
+
+                # Insert into PostgreSQL
+                df_teste.to_sql(
+                    'basket_teste',        # Table name
+                    engine,                # SQLAlchemy engine
+                    if_exists='replace',   # 'append', 'replace', or 'fail'
+                    index=False            # Don't write DataFrame index
+                )
+
+                log_operation("Inserted basket_teste", "success")
+            except Exception as e:
+                log_operation("Failed to update basket_teste!", "failed", str(e))
                 log_error_report(e)
 
         # Close connection
