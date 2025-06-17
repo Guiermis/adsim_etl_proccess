@@ -1902,6 +1902,9 @@ def main():
                 log_error_report(e)
 
             try:
+                items = pd.read_sql_query("SELECT * FROM proposal_items", engine)
+                dues = pd.read_sql_query("SELECT * FROM dues", engine)
+
                 #Calculo novo de basket
                 def calculo_novo(dues, items):
                     soma_veiculo_e_praca = items.groupby(['main_id'], as_index=False).agg(
