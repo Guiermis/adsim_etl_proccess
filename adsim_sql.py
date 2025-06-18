@@ -1827,148 +1827,148 @@ def main():
                 log_error_report(e)
                 log_operation(f"Error processing table {table_name}.", "failed", str(e))
 
-            try:
-                # Start a single transaction
-                with conn:
-                    cursor.execute("""
-                        -- Update 1: From displaylocations
-                        UPDATE dues
-                        SET channel_id = dl.channel_id
-                        FROM displaylocations dl
-                        WHERE dues.displaylocation_id = dl.displaylocation_id
-                        AND dues.channel_id IS NULL;
-                        
-                        -- Update 2: From deals
-                        UPDATE dues
-                        SET user_id = deals.responsible_id
-                        FROM deals
-                        WHERE dues.main_id = deals.main_id
-                        AND dues.user_id IS NULL;
-                        
-                        -- Update 3: From products
-                        UPDATE dues
-                        SET channel_id = p.channel_id
-                        FROM deals d
-                        JOIN products p ON d.product_id = p.product_id
-                        WHERE dues.main_id = d.main_id
-                        AND dues.channel_id IS NULL;
-                        
-                        -- Update 4: From proposal_items (exact match)
-                        UPDATE dues d
-                        SET channel_id = pi.channel_id
-                        FROM (
-                            SELECT main_id, channel_id, SUM(netvalue) AS total_net_value
-                            FROM proposal_items
-                            WHERE isgroupingproduct = false AND channel_id IS NOT NULL
-                            GROUP BY main_id, channel_id
-                        ) pi
-                        WHERE d.main_id = pi.main_id
-                        AND d.netvalue = pi.total_net_value
-                        AND d.channel_id IS NULL;
-                        
-                        -- Update 5: From proposal_items (fallback)
-                        UPDATE dues d
-                        SET channel_id = p.channel_id
-                        FROM proposal_items pi2
-                        JOIN products p ON pi2.product_id = p.product_id
-                        WHERE d.main_id = pi2.main_id
-                        AND d.channel_id IS NULL
-                        AND pi2.isgroupingproduct = false
-                        AND p.channel_id IS NOT NULL;
-                        
-                        -- Update 6: Delete duplicates (dues)
-                        WITH ranked_duplicates AS (
-                            SELECT *,
-                                ROW_NUMBER() OVER (
-                                    PARTITION BY channel_id, value, duedate, netvalue, paymentdate
-                                    ORDER BY registerdate DESC
-                                ) AS rn
-                            FROM dues
-                        )
-
-                        DELETE FROM dues
-                        WHERE dues_id IN (
-                            SELECT dues_id
-                            FROM ranked_duplicates
-                            WHERE rn > 1
-                        );
-                                   
-                        DELETE FROM basket_teste;
-                    """)
-                log_operation("All dues updates completed in single transaction", "success")
-
-            except Exception as e:
-                log_operation("Failed to update dues!", "failed", str(e))
-                log_error_report(e)
-
-            try:
-                items = pd.read_sql_query("SELECT * FROM proposal_items", engine)
-                dues = pd.read_sql_query("SELECT * FROM dues", engine)
-
-                #Calculo novo de basket
-                def calculo_novo(dues, items):
-                    soma_veiculo_e_praca = items.groupby(['main_id'], as_index=False).agg(
-                        total_proposal_net_value=('netvalue', 'sum')
-                    )
-
-                    porcentagem = items.drop(['program_id', 'format_id', 'isgroupingproduct', 'iswithoutdelivery', 
-                                            'groupidentifier', 'unitaryvalue', 'tablevalue', 'quantitytotal',
-                                            'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue',
-                                            'isproductioncosttodefine', 'grossvalue', 'isreapplication', 'distributiontype', 'startdate',
-                                            'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
-                                            'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name',
-                                            'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
-                                            'totaltablevalue', 'producttouse_id', 'producttouse_name', 'product_id'], axis=1)
+        try:
+            # Start a single transaction
+            with conn:
+                cursor.execute("""
+                    -- Update 1: From displaylocations
+                    UPDATE dues
+                    SET channel_id = dl.channel_id
+                    FROM displaylocations dl
+                    WHERE dues.displaylocation_id = dl.displaylocation_id
+                    AND dues.channel_id IS NULL;
                     
-                    porcentagem = porcentagem.groupby(['main_id', 'channel_id', 'displaylocation_id'], as_index=False).agg(
-                        channel_netvalue = ('netvalue', 'sum')
-                    )
+                    -- Update 2: From deals
+                    UPDATE dues
+                    SET user_id = deals.responsible_id
+                    FROM deals
+                    WHERE dues.main_id = deals.main_id
+                    AND dues.user_id IS NULL;
                     
-                    porcentagem = pd.merge(porcentagem, soma_veiculo_e_praca, how='left', on='main_id')
-
-                    porcentagem['porcentagem'] = porcentagem['channel_netvalue'] / porcentagem['total_proposal_net_value']
-
-                    dues = dues[dues['main_id'].isin(porcentagem['main_id'])]
-
-                    dues_months = dues.drop(['dues_id', 'company_id', 'value', 'paymentdate', 'registerdate', 'lastupdatedate', 'dealproposalitemid', 'channel_id', 'displaylocation_id'], axis=1)
-
-                    basket_teste = pd.merge(dues_months, porcentagem, how='left', on='main_id')
-
-                    basket_teste = basket_teste.drop(['channel_netvalue', 'total_proposal_net_value'], axis=1)
-
-                    basket_teste['basket_value'] = (
-                        basket_teste['netvalue'] * basket_teste['porcentagem'].fillna(1)
+                    -- Update 3: From products
+                    UPDATE dues
+                    SET channel_id = p.channel_id
+                    FROM deals d
+                    JOIN products p ON d.product_id = p.product_id
+                    WHERE dues.main_id = d.main_id
+                    AND dues.channel_id IS NULL;
+                    
+                    -- Update 4: From proposal_items (exact match)
+                    UPDATE dues d
+                    SET channel_id = pi.channel_id
+                    FROM (
+                        SELECT main_id, channel_id, SUM(netvalue) AS total_net_value
+                        FROM proposal_items
+                        WHERE isgroupingproduct = false AND channel_id IS NOT NULL
+                        GROUP BY main_id, channel_id
+                    ) pi
+                    WHERE d.main_id = pi.main_id
+                    AND d.netvalue = pi.total_net_value
+                    AND d.channel_id IS NULL;
+                    
+                    -- Update 5: From proposal_items (fallback)
+                    UPDATE dues d
+                    SET channel_id = p.channel_id
+                    FROM proposal_items pi2
+                    JOIN products p ON pi2.product_id = p.product_id
+                    WHERE d.main_id = pi2.main_id
+                    AND d.channel_id IS NULL
+                    AND pi2.isgroupingproduct = false
+                    AND p.channel_id IS NOT NULL;
+                    
+                    -- Update 6: Delete duplicates (dues)
+                    WITH ranked_duplicates AS (
+                        SELECT *,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY channel_id, value, duedate, netvalue, paymentdate
+                                ORDER BY registerdate DESC
+                            ) AS rn
+                        FROM dues
                     )
 
-                    basket_teste['channel_id'] = basket_teste['channel_id'].astype(int)
-                    basket_teste['displaylocation_id'] = basket_teste['displaylocation_id'].astype(int)
+                    DELETE FROM dues
+                    WHERE dues_id IN (
+                        SELECT dues_id
+                        FROM ranked_duplicates
+                        WHERE rn > 1
+                    );
+                                
+                    DELETE FROM basket_teste;
+                """)
+            log_operation("All dues updates completed in single transaction", "success")
 
-                    basket_teste['basket_id'] = (
-                        basket_teste['main_id'].astype(str) + 
-                        basket_teste['user_id'].astype(str) + 
-                        basket_teste['channel_id'].astype(str) + 
-                        basket_teste['displaylocation_id'].astype(str) + 
-                        basket_teste['duedate'].astype(str)
-                    )
+        except Exception as e:
+            log_operation("Failed to update dues!", "failed", str(e))
+            log_error_report(e)
 
-                    basket_teste = basket_teste.drop(['porcentagem', 'netvalue'], axis=1)
+        try:
+            items = pd.read_sql_query("SELECT * FROM proposal_items", engine)
+            dues = pd.read_sql_query("SELECT * FROM dues", engine)
 
-                    return basket_teste
-
-                df_teste = calculo_novo(dues, items)
-
-                # Insert into PostgreSQL
-                df_teste.to_sql(
-                    'basket_teste',        # Table name
-                    engine,                # SQLAlchemy engine
-                    if_exists='replace',   # 'append', 'replace', or 'fail'
-                    index=False            # Don't write DataFrame index
+            #Calculo novo de basket
+            def calculo_novo(dues, items):
+                soma_veiculo_e_praca = items.groupby(['main_id'], as_index=False).agg(
+                    total_proposal_net_value=('netvalue', 'sum')
                 )
 
-                log_operation("Inserted basket_teste", "success")
-            except Exception as e:
-                log_operation("Failed to update basket_teste!", "failed", str(e))
-                log_error_report(e)
+                porcentagem = items.drop(['program_id', 'format_id', 'isgroupingproduct', 'iswithoutdelivery', 
+                                        'groupidentifier', 'unitaryvalue', 'tablevalue', 'quantitytotal',
+                                        'discountpercentage', 'negotiatedvalue', 'quantity', 'productioncostvalue',
+                                        'isproductioncosttodefine', 'grossvalue', 'isreapplication', 'distributiontype', 'startdate',
+                                        'enddate', 'durationseconds', 'issendtogoogleadmanager', 'issponsorship',
+                                        'website_name', 'website_initials', 'device_name', 'page_name', 'visibility_name',
+                                        'nettablevalue', 'costmethod_name', 'costmethod_externalcode', 'costmethod_calculationstrategy',
+                                        'totaltablevalue', 'producttouse_id', 'producttouse_name', 'product_id'], axis=1)
+                
+                porcentagem = porcentagem.groupby(['main_id', 'channel_id', 'displaylocation_id'], as_index=False).agg(
+                    channel_netvalue = ('netvalue', 'sum')
+                )
+                
+                porcentagem = pd.merge(porcentagem, soma_veiculo_e_praca, how='left', on='main_id')
+
+                porcentagem['porcentagem'] = porcentagem['channel_netvalue'] / porcentagem['total_proposal_net_value']
+
+                dues = dues[dues['main_id'].isin(porcentagem['main_id'])]
+
+                dues_months = dues.drop(['dues_id', 'company_id', 'value', 'paymentdate', 'registerdate', 'lastupdatedate', 'dealproposalitemid', 'channel_id', 'displaylocation_id'], axis=1)
+
+                basket_teste = pd.merge(dues_months, porcentagem, how='left', on='main_id')
+
+                basket_teste = basket_teste.drop(['channel_netvalue', 'total_proposal_net_value'], axis=1)
+
+                basket_teste['basket_value'] = (
+                    basket_teste['netvalue'] * basket_teste['porcentagem'].fillna(1)
+                )
+
+                basket_teste['channel_id'] = basket_teste['channel_id'].astype(int)
+                basket_teste['displaylocation_id'] = basket_teste['displaylocation_id'].astype(int)
+
+                basket_teste['basket_id'] = (
+                    basket_teste['main_id'].astype(str) + 
+                    basket_teste['user_id'].astype(str) + 
+                    basket_teste['channel_id'].astype(str) + 
+                    basket_teste['displaylocation_id'].astype(str) + 
+                    basket_teste['duedate'].astype(str)
+                )
+
+                basket_teste = basket_teste.drop(['porcentagem', 'netvalue'], axis=1)
+
+                return basket_teste
+
+            df_teste = calculo_novo(dues, items)
+
+            # Insert into PostgreSQL
+            df_teste.to_sql(
+                'basket_teste',        # Table name
+                engine,                # SQLAlchemy engine
+                if_exists='replace',   # 'append', 'replace', or 'fail'
+                index=False            # Don't write DataFrame index
+            )
+
+            log_operation("Inserted basket_teste", "success")
+        except Exception as e:
+            log_operation("Failed to update basket_teste!", "failed", str(e))
+            log_error_report(e)
 
         # Close connection
         cursor.close()
