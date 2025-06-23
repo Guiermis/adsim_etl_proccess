@@ -63,9 +63,14 @@ def log_warning_report(warning_message, details=None):
 
 def save_report(report):
     """
-    Saves the report to a JSON file in a folder named 'reports'.
+    Saves the report to a JSON file in a folder named 'reports' only if status is "failed".
     If the folder doesn't exist, it creates it.
     """
+    # Only proceed if status is "failed"
+    if report.get("status") != "failed":
+        logging.info("Report not saved as status is not 'failed'")
+        return
+    
     # Define the folder name
     reports_folder = Path("reports")
     
