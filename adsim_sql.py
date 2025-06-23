@@ -68,7 +68,7 @@ def save_report(report):
     """
     # Only proceed if status is "failed"
     if report.get("status") != "failed":
-        logging.info("Report not saved as status is not 'failed'")
+        print("Report not saved as status is not 'failed'")
         return
     
     # Define the folder name
