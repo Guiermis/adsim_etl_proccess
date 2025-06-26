@@ -411,7 +411,7 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
 
 def compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, df1, df2):
     result = find_differences(df1, df2, id_column, columns_to_check)
-    time.sleep(5)
+    time.sleep(1)
     update_or_insert_rows(conn,cursor, table_name, id_column, columns_to_check, result["rows_to_update"], result["rows_to_insert"])
 
 def extract_adsim_data(url, max_retries=3, timeout_seconds=30, retry_delay_seconds=5):
