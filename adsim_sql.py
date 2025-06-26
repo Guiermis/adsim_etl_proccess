@@ -1899,6 +1899,31 @@ def main():
                     );
                                 
                     DELETE FROM basket_teste;
+                               
+                    -- Update 7: Delete Old Dues
+                    WITH ranked_dues AS (
+                        SELECT *,
+                            ROW_NUMBER() OVER (PARTITION BY main_id ORDER BY registerdate DESC) AS rn
+                        FROM dues
+                        WHERE main_id IN (
+                            SELECT a.main_id
+                            FROM (
+                                SELECT main_id, SUM(netvalue) AS total_netvalue
+                                FROM dues
+                                GROUP BY main_id
+                            ) AS a
+                            JOIN deals AS b ON a.main_id = b.main_id
+                            WHERE (a.total_netvalue - b.netvalue) >= 1
+                            AND b.iswon = true
+                            AND b.netvalue <> 0
+                        )
+                    )
+                    DELETE FROM dues
+                    WHERE (main_id, registerdate) IN (
+                        SELECT main_id, registerdate
+                        FROM ranked_dues
+                        WHERE rn > 1  -- Only delete if there are older records
+                    );
                 """)
             log_operation("All dues updates completed in single transaction", "success")
 
