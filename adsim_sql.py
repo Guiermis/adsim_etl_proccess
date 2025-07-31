@@ -854,6 +854,43 @@ def main():
         pipeline = ensure_columns(pipeline, needed_columns['pipeline'], drop_extra_columns=False)
 
         df['pipeline_id'] = pipeline['id']
+        
+        # --- Pipeline spliting for Curitiba logic --- 
+        # Dictionary to map the correct pipeline_id based on user_id
+        reposible_user = {
+            # Users remaining in Curitiba 1 (Pipeline 1077)
+            22676: 1077, 17295: 1077, 25414: 1077, 24783: 1077, 17266: 1077,
+            22933: 1077, 26210: 1077, 20364: 1077,
+
+            # Users moved to Curitiba 2 (Pipeline 2184)
+            14467: 2184, 14498: 2184, 14501: 2184, 15965: 2184, 17263: 2184,
+            17296: 2184, 22678: 2184, 22748: 2184, 22749: 2184, 22751: 2184,
+            23189: 2184, 23190: 2184, 23665: 2184, 24253: 2184, 24785: 2184,
+            25427: 2184, 25583: 2184, 25798: 2184, 26658: 2184, 26793: 2184,
+            28125: 2184, 27404: 2184
+        }
+        
+        # Applying the pipeline splitting logic
+        curitiba_mask = df['pipeline_id'] == 1077
+        if curitiba_mask.any():
+            df.loc[curitiba_mask, 'pipeline_id'] = df.loc[curitiba_mask].apply(
+                lambda row: reposible_user.get(
+                    row['responsibleUser'].get('id') if isinstance(row['responsibleUser'], dict) else None, 
+                    1077
+                ),
+                axis=1
+            )
+        
+        if 2184 not in pipeline['id'].values:
+            new_pipeline = pipeline[pipeline['id'] == 1077].copy()
+            new_pipeline['id'] = 2184
+            new_pipeline['name'] = 'Curitiba 2'
+            pipeline = pd.concat([pipeline, new_pipeline], ignore_index=True)
+            
+            log_operation("Pipeline splitting for Curitiba completed", "success")
+        else:
+            log_operation("No deals found in Curitiba (1077)", "warning")
+        
         pipeline = pipeline.rename(columns={'id': 'pipeline_id'})
         df = drop_columns(df, columns_to_drop=['pipeline'])
 
