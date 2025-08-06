@@ -322,6 +322,10 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
                                 values.append(row[col])
 
                             set_clauses.append(f"{col} = %s")
+                            
+                            # Handle numpy int values
+                            if isinstance(row[col], np.integer):
+                                values.append(int(row[col]))
 
                     if not set_clauses:
                         log_operation(f"No columns to update for row {row[id_column]} in {table_name} after skipping empty values.", "warning")
