@@ -1279,8 +1279,8 @@ def main():
     
     # Load matriz_equipes from Excel
     try:
-        matriz_equipes = pd.read_excel(r'./xlsx_files/matriz_equipes.xlsx', header=0)  # Ensure the first row is used as the header
-        matriz_equipes.columns = ['equipe_id', 'equipe_name']  # Rename columns explicitly if needed
+        if gc is not None:
+            print("Using Google Sheets to load matriz_equipes...")
             planilha = gc.open("matriz_equipes")
             aba = planilha.worksheet("sheet")
             dados_equipes = aba.get_all_records()
