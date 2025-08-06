@@ -114,10 +114,26 @@ scopes = ["https://www.googleapis.com/auth/spreadsheets",
 json_file = r"./json_files/credentials.json"
 
 def login():
-    credentials = service_account.Credentials.from_service_account_file(json_file)
-    scoped_credentials = credentials.with_scopes(scopes)
-    gc = gspread.authorize(scoped_credentials)
-    return gc
+    try:
+        print(f"Loading credentials from: {json_file}")
+        credentials = service_account.Credentials.from_service_account_file(json_file)
+        print("Credentials loaded successfully")
+        
+        print("Applying scopes...")
+        scoped_credentials = credentials.with_scopes(scopes)
+        print("Scopes applied successfully")
+        
+        print("Authorizing with gspread...")
+        gc = gspread.authorize(scoped_credentials)
+        print("Authorization successful")
+        
+        return gc
+    except FileNotFoundError as e:
+        print(f"Credentials file not found: {json_file}")
+        raise e
+    except Exception as e:
+        print(f"Error in login(): {type(e).__name__}: {str(e)}")
+        raise e
 
 def replace_nat_with_none(df):
     """
@@ -841,6 +857,19 @@ def safe_merge(df1, df2, id_column, columns_to_merge, merge_type='inner'):
         return df1  # Return the original DataFrame if an error occurs
 
 def main():
+    # Initialize Google Sheets client
+    gc = None  # Initialize as None first
+    try:
+        print("Attempting to initialize Google Sheets client...")
+        gc = login()
+        print(f"Google Sheets client initialized successfully: {gc}")
+        log_operation("Google Sheets client initialized successfully", "success")
+    except Exception as e:
+        print(f"Failed to initialize Google Sheets client: {type(e).__name__}: {str(e)}")
+        log_error_report(e)
+        log_operation("Failed to initialize Google Sheets client", "failed", str(e))
+        gc = None  # Set to None if initialization fails
+    
     #deals table block
     try:
         df = extract_adsim_data(deals_url)
@@ -1245,10 +1274,27 @@ def main():
         log_error_report(e)
         log_operation("logs data extraction failed!", "failed", str(e))
 
+    # Initialize matriz_equipes with default empty DataFrame
+    matriz_equipes = pd.DataFrame(columns=['equipe_id', 'equipe_name'])
+    
     # Load matriz_equipes from Excel
     try:
         matriz_equipes = pd.read_excel(r'./xlsx_files/matriz_equipes.xlsx', header=0)  # Ensure the first row is used as the header
         matriz_equipes.columns = ['equipe_id', 'equipe_name']  # Rename columns explicitly if needed
+            planilha = gc.open("matriz_equipes")
+            aba = planilha.worksheet("sheet")
+            dados_equipes = aba.get_all_records()
+            matriz_equipes = pd.DataFrame(dados_equipes)
+            print("Successfully loaded matriz_equipes from Google Sheets")
+        else:
+            print("Google Sheets client is None, falling back to Excel file...")
+            # Fallback to Excel file if Google Sheets is not available
+            matriz_equipes = pd.read_excel(r'./xlsx_files/matriz_equipes.xlsx', header=0)
+            print("Successfully loaded matriz_equipes from Excel file")
+        
+        # Ensure the first row is used as the header and rename columns
+        if 'matriz_equipes' in locals() and not matriz_equipes.empty:
+            matriz_equipes.columns = ['equipe_id', 'equipe_name']  # Rename columns explicitly if needed
 
         # Ensure it is a DataFrame
         if not isinstance(matriz_equipes, pd.DataFrame):
@@ -1275,11 +1321,20 @@ def main():
 
     #excel script block
     try:
-        matriz_executivos = pd.read_excel(r'./xlsx_files/matriz_executivos.xlsx')
-        users = safe_merge(users, matriz_executivos, 'login', 'equipe_id', 'inner')
-        
-        del matriz_executivos
-        log_operation("excel data fetched succesfully!", "success")
+        if gc is not None:
+            print("Using Google Sheets to load users_info...")
+            planilha = gc.open("users_info")
+            aba = planilha.worksheet("sheet")
+            dados_executivos = aba.get_all_records()
+            matriz_executivos = pd.DataFrame(dados_executivos)
+            users = safe_merge(users, matriz_executivos, 'login', 'equipe_id', 'inner')
+            
+            del matriz_executivos
+            print("Successfully loaded users_info from Google Sheets")
+            log_operation("excel data fetched succesfully!", "success")
+        else:
+            print("Google Sheets client is None, skipping users_info fetch")
+            log_operation("Google Sheets client not available, skipping users_info fetch", "warning")
     except Exception as e:
         log_error_report(e)
         log_operation("excel data fetch failed!", "failed", str(e))
@@ -1535,12 +1590,17 @@ def main():
     try:
         def fetch_sales_data(gc):
             """Function to fetch sales data from Google Sheets."""
-            planilha = gc.open("VENDAS 2025 VERSÃO EUA")
-            aba = planilha.worksheet("sheet")
-            dados = aba.get_all_records()
-            return pd.DataFrame(dados)
+            if gc is not None:
+                print("Using Google Sheets to load VENDAS 2025 VERSÃO EUA...")
+                planilha = gc.open("VENDAS 2025 VERSÃO EUA")
+                aba = planilha.worksheet("sheet")
+                dados = aba.get_all_records()
+                print("Successfully loaded sales data from Google Sheets")
+                return pd.DataFrame(dados)
+            else:
+                print("Google Sheets client is None, returning empty DataFrame for sales data")
+                return pd.DataFrame()  # Return empty DataFrame if gc is None
 
-        gc = login()
         timeout_seconds = 35
 
         with futures.ThreadPoolExecutor() as executor:
@@ -1907,48 +1967,30 @@ def main():
         "activities" : ("activity_id", ['main_id', 'organization_id', 'person_id', 'company_id', 'user_id', 'startdate', 'enddate', 'donedate', 'isdone', 
                                         'isallday', 'title', 'notes', 'checkin_date', 'checkin_latitude', 'checkin_longitude', 'type_id'], activities)
         }
-        
-        # New function to compare database with google sheet and delete missing rows
-        def delete_missing_rows_from_db(conn, cursor, table_name, id_column, new_ids):
-            """
-            Deletes rows from the database table that are not present in the new_ids list.
-            This is used to ensure the database matches the source of truth (e.g., Google Sheet).
-            """
-            db_ids = pd.read_sql_query(f"SELECT {id_column} FROM {table_name}", conn)[id_column]
-            db_ids_set = set(db_ids)
-            new_ids_set = set(new_ids)
-            ids_to_delete = db_ids_set - new_ids_set
-            if ids_to_delete:
-                placeholders = ', '.join(['%s'] * len(ids_to_delete))
-                delete_sql = f"DELETE FROM {table_name} WHERE {id_column} IN ({placeholders})"
-                cursor.execute(delete_sql, tuple(ids_to_delete))
-                conn.commit()
-                log_operation(f"Deleted {len(ids_to_delete)} rows from {table_name} that were removed from the Google Sheet.", "success")
 
         for table_name, (id_column, columns_to_check, new_data_df) in table_mappings.items():
             try:
-                # For the sales table, fetch all rows to ensure deletions work correctly
-                if table_name == "sales":
-                    sql_data = pd.read_sql_query(f"SELECT * FROM {table_name}", engine)
-                    # Ensure DB matches sheet: delete any sales not present in the latest sheet
-                    if not new_data_df.empty and id_column in new_data_df.columns:
-                        new_ids = new_data_df[id_column].dropna().unique().tolist()
-                        delete_missing_rows_from_db(conn, cursor, table_name, id_column, new_ids)
-                else:
-                    # Existing logic for other tables
-                    if not new_data_df.empty and id_column in new_data_df.columns:
-                        ids_to_fetch = new_data_df[id_column].dropna().unique().tolist()
-                        if ids_to_fetch:
-                            placeholders = ', '.join(['%s'] * len(ids_to_fetch))
-                            sql_query = f"SELECT * FROM {table_name} WHERE {id_column} IN ({placeholders})"
-                            sql_data = pd.read_sql_query(sql_query, engine, params=tuple(ids_to_fetch))
-                            log_operation(f"Fetched {len(sql_data)} specific rows from {table_name} based on new data IDs.", "success")
-                        else:
-                            log_operation(f"No valid IDs found in new data for {table_name}. Fetching empty structure.", "info")
-                            sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
+                # Check if the new data DataFrame is not empty and the ID column exists
+                if not new_data_df.empty and id_column in new_data_df.columns:
+                    # Get unique, non-null IDs from the new data
+                    ids_to_fetch = new_data_df[id_column].dropna().unique().tolist()
+
+                    # If there are IDs to fetch, query only those rows
+                    if ids_to_fetch:
+                        # Use placeholders for security and efficiency
+                        placeholders = ', '.join(['%s'] * len(ids_to_fetch))
+                        sql_query = f"SELECT * FROM {table_name} WHERE {id_column} IN ({placeholders})"
+                        # Pass the list of IDs as parameters
+                        sql_data = pd.read_sql_query(sql_query, engine, params=tuple(ids_to_fetch))
+                        log_operation(f"Fetched {len(sql_data)} specific rows from {table_name} based on new data IDs.", "success")
                     else:
-                        log_operation(f"New data for {table_name} is empty or missing ID column '{id_column}'. Fetching empty structure.", "info")
+                        # No valid IDs in new data, fetch empty structure from DB
+                        log_operation(f"No valid IDs found in new data for {table_name}. Fetching empty structure.", "info")
                         sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
+                else:
+                    # New data is empty or ID column missing, fetch empty structure
+                    log_operation(f"New data for {table_name} is empty or missing ID column '{id_column}'. Fetching empty structure.", "info")
+                    sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
 
                 # Proceed with comparison and update
                 compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, new_data_df)
@@ -2052,7 +2094,7 @@ def main():
                     );
                     
                     UPDATE public.pipeline
-                    SET title = 'Curitiba 2'
+                    SET title = 'CURITIBA II'
                     WHERE pipeline_id = 2184;
                 """)
             log_operation("All dues updates completed in single transaction", "success")
