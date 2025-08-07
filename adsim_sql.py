@@ -313,23 +313,27 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
 
                     for col in columns_to_check:
                         if col in row:
-                            if row[col] is None or row[col] == "" or (isinstance(row[col], (int, float)) and pd.isna(row[col])) or pd.isna(row[col]):
-                                skipped_count +=1
-                                continue
-                            
-                            if isinstance(row[col], (int, float)) and not pd.isna(row[col]):
-                                if not (-9223372036854775808 <= row[col] <= 9223372036854775807):
-                                    problematic_columns.append((col, row[col]))
+                            # Check for range violations first (only for numeric types)
+                            if isinstance(row[col], (int, float, np.integer, np.floating)) and not pd.isna(row[col]):
+                                numeric_value = convert_numpy_to_python(row[col])
+                                if not (-9223372036854775808 <= numeric_value <= 9223372036854775807):
+                                    problematic_columns.append((col, numeric_value))
                                     log_operation(
-                                        f"Value out of range for bigint in column '{col}' during update in table '{table_name}' (ID: {row[id_column]}), Value: {row[col]}",
+                                        f"Value out of range for bigint in column '{col}' during update in table '{table_name}' (ID: {row[id_column]}), Value: {numeric_value}",
                                         "warning"
                                     )
                                     continue
 
-                            # Handle date/datetime columns and NumPy types before adding to values
-                            value_to_add = convert_numpy_to_python(row[col])
-                            values.append(value_to_add)
-                            set_clauses.append(f"{col} = %s")
+                            # Only skip if the NEW value from API is actually None/empty
+                            # This allows updating database None values with valid API data
+                            if row[col] is not None and not pd.isna(row[col]) and row[col] != "":
+                                # Handle date/datetime columns and NumPy types before adding to values
+                                value_to_add = convert_numpy_to_python(row[col])
+                                values.append(value_to_add)
+                                set_clauses.append(f"{col} = %s")
+                            else:
+                                # Log when we skip due to None/empty values from API
+                                skipped_count += 1
 
                     if not set_clauses:
                         log_operation(f"No columns to update for row {row[id_column]} in {table_name} after skipping empty values.", "warning")
