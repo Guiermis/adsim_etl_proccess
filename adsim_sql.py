@@ -251,6 +251,19 @@ def find_differences(df1, df2, id_column, columns_to_check):
         "rows_to_insert": rows_to_insert
     }
 
+def convert_numpy_to_python(value):
+    """
+    Convert NumPy types to Python native types for SQL operations.
+    """
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    elif isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+    elif isinstance(value, date):
+        return value
+    else:
+        return value
+
 def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check, rows_to_update, rows_to_insert):
     """
     Updates or inserts rows in a database table, with enhanced error tracking.
@@ -313,19 +326,10 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
                                     )
                                     continue
 
-                            # Handle date/datetime columns
-                            if isinstance(row[col], pd.Timestamp):
-                                values.append(row[col].to_pydatetime())
-                            elif isinstance(row[col], date):
-                                values.append(row[col])
-                            else:
-                                values.append(row[col])
-
+                            # Handle date/datetime columns and NumPy types before adding to values
+                            value_to_add = convert_numpy_to_python(row[col])
+                            values.append(value_to_add)
                             set_clauses.append(f"{col} = %s")
-                            
-                            # Handle numpy int values
-                            if isinstance(row[col], np.integer):
-                                values.append(int(row[col]))
 
                     if not set_clauses:
                         log_operation(f"No columns to update for row {row[id_column]} in {table_name} after skipping empty values.", "warning")
@@ -336,7 +340,13 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
                         continue
 
                     set_clause = ", ".join(set_clauses)
-                    values.append(row[id_column])
+                    
+                    # Convert ID column value from NumPy types if needed
+                    id_value = row[id_column]
+                    if isinstance(id_value, (np.integer, np.floating)):
+                        id_value = id_value.item()
+                    
+                    values.append(id_value)
                     sql_update = f"UPDATE {table_name} SET {set_clause} WHERE {id_column} = %s"
                     
                     try:
@@ -387,22 +397,22 @@ def update_or_insert_rows(conn, cursor, table_name, id_column, columns_to_check,
                         values.append(None) # Treat as null
                         continue
 
-                    if isinstance(row[col], (int, float)):
-                        if not (-9223372036854775808 <= row[col] <= 9223372036854775807):
-                            row_problematic_columns.append((col, row[col]))
+                    # Check for values out of range for bigint
+                    if isinstance(row[col], (int, float, np.integer, np.floating)):
+                        # Convert NumPy types first to check range properly
+                        numeric_value = convert_numpy_to_python(row[col])
+                        if not (-9223372036854775808 <= numeric_value <= 9223372036854775807):
+                            row_problematic_columns.append((col, numeric_value))
                             log_operation(
-                                f"Value out of range for bigint in column '{col}' during insert in table '{table_name}' (ID: {row[id_column]}), Value: {row[col]}",
+                                f"Value out of range for bigint in column '{col}' during insert in table '{table_name}' (ID: {row[id_column]}), Value: {numeric_value}",
                                 "warning"
                             )
                             continue
-                        values.append(row[col])
-
-                    elif isinstance(row[col], pd.Timestamp):
-                        values.append(row[col].to_pydatetime())
-                    elif isinstance(row[col], date):
-                        values.append(row[col])
+                        values.append(numeric_value)
                     else:
-                        values.append(row[col])
+                        # Handle all other types (dates, strings, etc.)
+                        converted_value = convert_numpy_to_python(row[col])
+                        values.append(converted_value)
 
                 if row_problematic_columns:
                     problematic_rows.append((row[id_column], row_problematic_columns))
