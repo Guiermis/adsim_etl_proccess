@@ -6,6 +6,7 @@ import numpy as np
 import psycopg2
 import time
 import os
+import requests
 import threading
 import subprocess
 import logging
@@ -99,11 +100,13 @@ start = end - timedelta(minutes=45)
 start_date = start.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 logs_start_str = start.strftime("%Y-%m-%d")
 
-deals_url = f"https://api.adsim.co/crm-r/api/v2/deals?start={start_date}&end={end_date}"
-logs_url = f'https://api.adsim.co/crm-r/api/v2/deals/steps/logs?enterDateStart={logs_end_str}'
-proposals_url = f'https://api.adsim.co/crm-r/api/v2/deals/proposals?start={start_date}&end={end_date}'
-organization_url = f"https://api.adsim.co/crm-r/api/v2/entities?start={start_date}&end={end_date}"
-activities_url = f"https://api.adsim.co/crm-r/api/v2/activity?start={start_date}"
+endpoints = [
+	f"https://api.adsim.co/crm-r/api/v2/deals?start={start_date}&end={end_date}",
+	f'https://api.adsim.co/crm-r/api/v2/deals/steps/logs?enterDateStart={logs_end_str}',
+	f'https://api.adsim.co/crm-r/api/v2/deals/proposals?start={start_date}&end={end_date}',
+	f"https://api.adsim.co/crm-r/api/v2/entities?start={start_date}&end={end_date}",
+	f"https://api.adsim.co/crm-r/api/v2/activity?start={start_date}"		
+]
 
 headers = {
     "authorization" : f"Bearer {adsim_token}",
@@ -847,7 +850,7 @@ def safe_merge(df1, df2, id_column, columns_to_merge, merge_type='inner'):
     """
     # Check if id_column exists in both DataFrames
     if id_column not in df1.columns or id_column not in df2.columns:
-        log_operation(f"Column '{id_column}' not found in one or both DataFrames.", "failed")
+        log_operation(f"Column '{id_column}' not found in one or both DataFrames. Df {df1} and df {df2}", "failed")
         return df1  # Return the original DataFrame if the merge key is missing
 
     # Check if id_column is unique in df2
@@ -874,7 +877,17 @@ def safe_merge(df1, df2, id_column, columns_to_merge, merge_type='inner'):
         log_operation(f"Merge failed: {str(e)}", "failed")
         return df1  # Return the original DataFrame if an error occurs
 
-def main():
+def call_api(endpoint):
+        response = requests.get(endpoint)
+        data = response.json()
+        return pd.DataFrame(data)
+
+def main():    
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        api_response = executor.map(extract_adsim_data, endpoints)
+    
+    dataframes = list(api_response)
+        
     # Initialize Google Sheets client
     gc = None  # Initialize as None first
     try:
@@ -890,7 +903,7 @@ def main():
     
     #deals table block
     try:
-        df = extract_adsim_data(deals_url)
+        df = dataframes[0]
         df = ensure_columns(df, needed_columns['deals'],drop_extra_columns=False)
         df = df.rename(columns={'id': 'main_id'})
 
@@ -1029,7 +1042,7 @@ def main():
 
         df['organization_id'] = organization2['id']
 
-        organization = extract_adsim_data(organization_url)
+        organization = dataframes[3]
         organization = ensure_columns(organization, needed_columns['organization'], drop_extra_columns=False)
 
         organization = organization.rename(columns={'id' : 'organization_id'})
@@ -1266,7 +1279,7 @@ def main():
 
     #logs script block
     try:
-        pf = extract_adsim_data(logs_url)
+        pf = dataframes[1]
         pf = ensure_columns(pf, needed_columns['historico'], drop_extra_columns=False)
 
         print(pf)
@@ -1359,7 +1372,7 @@ def main():
 
     #proposals script block
     try:
-        gf = extract_adsim_data(proposals_url)
+        gf = dataframes[2]
 
         matriz_geotargets = pd.read_excel(r'./xlsx_files/IDS_TargetsDigital.xlsx')        
         log_operation("proposals and geotargets dataframes created succesfully!", "success")
@@ -1536,7 +1549,7 @@ def main():
 
     #activities script block
     try:
-        activities = extract_adsim_data(activities_url)
+        activities = dataframes[4]
         activities = ensure_columns(activities, needed_columns['activities'], drop_extra_columns=False)
         activities['startDate'] = pd.to_datetime(activities['startDate'])
         activities['endDate'] = pd.to_datetime(activities['endDate'])
