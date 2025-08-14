@@ -906,7 +906,43 @@ def main():
         df = dataframes[0]
         df = ensure_columns(df, needed_columns['deals'],drop_extra_columns=False)
         df = df.rename(columns={'id': 'main_id'})
-
+        # Extract deal origin information
+        try:
+            origin_df = pd.json_normalize(df['dealOrigin'])
+            if not origin_df.empty:
+                origin_df = origin_df.rename(columns={'name' : 'deal_origin'})
+                # Keep only the descriptive column if id not needed
+                if 'id' in origin_df.columns:
+                    origin_df.drop(columns=['id'], inplace=True, errors='ignore')
+                df = df.join(origin_df)
+            df.drop(columns=['dealOrigin'], inplace=True, errors='ignore')
+        except Exception as e:
+            # If anything goes wrong, still guarantee the column exists
+            log_operation("Failed to extract dealOrigin; continuing with None values", "warning", str(e))
+        # Ensure deal_origin column exists
+        if 'deal_origin' not in df.columns:
+            df['deal_origin'] = None
+            
+        # Extract lost reason information
+        try:
+            lostreasondf = pd.json_normalize(df['lostReason'])
+            if not lostreasondf.empty:
+                lostreasondf = lostreasondf.rename(columns={'description' : 'lostreason_description'})
+                # Keep only the descriptive column if id not needed
+                if 'id' in lostreasondf.columns:
+                    lostreasondf.drop(columns=['id'], inplace=True, errors='ignore')
+                df = df.join(lostreasondf)
+            df.drop(columns=['lostReason'], inplace=True, errors='ignore')
+        except Exception as e:
+            # If anything goes wrong, still guarantee the column exists
+            log_operation("Failed to extract lostReason; continuing with None values", "warning", str(e))
+        # Ensure lostReason column exists
+        if 'lostreason_description' not in df.columns:
+            df['lostreason_description'] = None
+        # Ensure lostReasonNote column exists (API may already provide it)
+        if 'lostReasonNote' not in df.columns:
+            df['lostReasonNote'] = None
+            
         df['registerDate'] = pd.to_datetime(df['registerDate'], errors='coerce')
         df['lastUpdateDate'] = pd.to_datetime(df['lastUpdateDate'], errors='coerce')
 
@@ -1977,11 +2013,12 @@ def main():
         "dealtype" : ("dealtype_id", ['isactive', 'description'], dealType),
         "person" : ("person_id", ['cpf', 'name'], person),
         "portfolio" : ('portfolio_id', ['user_id', 'description', 'enddate', 'isactive', 'startdate', 'lastupdatedate'], portfolios),
+        # Note: after normalization all columns are lowercased
         "deals" : ("main_id", ['pipeline_id', 'creatoruser_id', 'responsible_id', 'pipelinestep_id', 'organization_id', 
             'product_id', 'dealtype_id', 'agencies_id', 'iswon', 'islost', 'enddate', 'windate', 'losedate', 'netvalue', 
             'isdeleted', 'ispending', 'startdate', 'shelvedate', 'description', 'approvaldate', 'registerdate', 'sequenceorder', 
             'conclusiondate', 'conversiondate', 'lastupdatedate', 'negotiatedvalue', 'productquantity', 'forecastsalesdate', 'isadvancedproduct', 
-            'activitiesquantity', 'hasproductswithquotas', 'agencycommissionpercentage'], df),
+            'activitiesquantity', 'hasproductswithquotas', 'agencycommissionpercentage', 'lostreason_description', 'lostreasonnote', 'deal_origin'], df),
         "dues" : ("dues_id", ['main_id', 'value', 'user_id', 'channel_id', 'duedate', 
             'netvalue', 'company_id', 'paymentdate', 'registerdate', 'lastupdatedate', 'displaylocation_id'], dues),
         "sales" : ("id", ['regiao', 'area_negocio', 'produto', 'meta', 'realizado', 
