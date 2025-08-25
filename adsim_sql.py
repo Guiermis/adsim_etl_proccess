@@ -1246,16 +1246,8 @@ def main():
         dues['atualizacao_data'] = dues['lastUpdateDate'].dt.date
 
         dues = dues.rename(columns={
-            'id' : 'dues_id', 
-            'userId' : 'user_id', 
-            'companyId' : 'company_id',
-            'dueDate': 'duedate',
-            'netValue': 'netvalue', 
-            'paymentDate': 'paymentdate',
-            'registerDate': 'registerdate',
-            'lastUpdateDate': 'lastupdatedate',
-            'displayLocation_id': 'displaylocation_id',
-            'dealProposalItemId': 'dealproposalitemid'
+            'id' : 'dues_id',
+            'companyId' : 'company_id'
         })
 
         log_operation("dues dataframe created succesfully!", "success")
