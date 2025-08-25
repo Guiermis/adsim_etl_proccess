@@ -1336,7 +1336,7 @@ def main():
     # Initialize matriz_equipes with default empty DataFrame
     matriz_equipes = pd.DataFrame(columns=['equipe_id', 'equipe_name'])
     
-    # Load matriz_equipes from Excel
+    # Load matriz_equipes from Google Sheets
     try:
         if gc is not None:
             print("Using Google Sheets to load matriz_equipes...")
@@ -1700,28 +1700,36 @@ def main():
         vendas.loc[(vendas['EXECUTIVO'].str.contains('CARTEIRA 6')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "ANDRÉ MORAIS"   
         vendas.loc[(vendas['EXECUTIVO'].str.contains('EXECUTIVO 06')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "ANDRÉ MORAIS" 
 
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "JOSÉ TRAVAGIN"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('PONTA GROSSA')), 'EXECUTIVO'] = "MATHEUS KONIG"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "FABIO GOES"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('OESTE')), 'EXECUTIVO'] = "PEDRO ANDRADE"
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "RODRIGO TABORDA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('SEDE')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "EVERTON COSTA"
 
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "JOSÉ TRAVAGIN"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('PONTA GROSSA')), 'EXECUTIVO'] = "MATHEUS KONIG"
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "RODRIGO TABORDA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "EVERTON COSTA"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('OESTE')), 'EXECUTIVO'] = "PEDRO ANDRADE"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "FABIO GOES"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('PROJETO')) & (vendas['REGIÃO'].str.contains('NACIONAL')), 'EXECUTIVO'] = "JOSÉ TRAVAGIN"
 
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "ANDERSON SOUZA"
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "RODRIGO TABORDA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "VIVIAN SENS"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "EVERTON COSTA"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('OESTE')), 'EXECUTIVO'] = "PEDRO ANDRADE"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('CONCESSIONÁRIO')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "FABIO GOES"
 
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "ANDERSON SOUZA"
-        vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "RODRIGO TABORDA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('CURITIBA')), 'EXECUTIVO'] = "VIVIAN SENS"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('LONDRINA')), 'EXECUTIVO'] = "EVERTON COSTA"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('MARINGÁ')), 'EXECUTIVO'] = "FABIO GOES"
         vendas.loc[(vendas['EXECUTIVO'].str.contains('ENTRE PRAÇAS')) & (vendas['REGIÃO'].str.contains('OESTE')), 'EXECUTIVO'] = "PEDRO ANDRADE"
+        
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('DIRETORIA')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('PREFEITURA INTERIOR')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('GOVERNO FEDERAL')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('GOVERNO ESTADUAL')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('IMPORTAÇÃO')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('G7 + SEBRAE')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
+        vendas.loc[(vendas['EXECUTIVO'].str.contains('ALEP')) & (vendas['PRAÇA'].str.contains('BANDA B')), 'EXECUTIVO'] = "ANDERSON SOUZA"
 
         vendas = vendas[vendas['REGIÃO'] != 'ESP. CEDIDO']
         vendas = vendas[vendas['EXECUTIVO'] != 'PERFORMANCE']
