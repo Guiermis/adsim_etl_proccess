@@ -878,9 +878,9 @@ def safe_merge(df1, df2, id_column, columns_to_merge, merge_type='inner'):
         return df1  # Return the original DataFrame if an error occurs
 
 def call_api(endpoint):
-        response = requests.get(endpoint)
-        data = response.json()
-        return pd.DataFrame(data)
+    response = requests.get(endpoint)
+    data = response.json()
+    return pd.DataFrame(data)
 
 def main():    
     with ThreadPoolExecutor(max_workers=5) as executor:
