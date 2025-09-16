@@ -2040,31 +2040,73 @@ def main():
 
         for table_name, (id_column, columns_to_check, new_data_df) in table_mappings.items():
             try:
-                # Check if the new data DataFrame is not empty and the ID column exists
-                if not new_data_df.empty and id_column in new_data_df.columns:
-                    # Get unique, non-null IDs from the new data
-                    ids_to_fetch = new_data_df[id_column].dropna().unique().tolist()
+                with conn:
+                    if not new_data_df.empty and id_column in new_data_df.columns:
+                        ids_to_fetch = new_data_df[id_column].dropna().unique().tolist()
 
-                    # If there are IDs to fetch, query only those rows
-                    if ids_to_fetch:
-                        # Use placeholders for security and efficiency
-                        placeholders = ', '.join(['%s'] * len(ids_to_fetch))
-                        sql_query = f"SELECT * FROM {table_name} WHERE {id_column} IN ({placeholders})"
-                        # Pass the list of IDs as parameters
-                        sql_data = pd.read_sql_query(sql_query, engine, params=tuple(ids_to_fetch))
-                        log_operation(f"Fetched {len(sql_data)} specific rows from {table_name} based on new data IDs.", "success")
+                        if ids_to_fetch:
+                            placeholders = ', '.join(['%s'] * len(ids_to_fetch))
+                            sql_query = f"SELECT * FROM {table_name} WHERE {id_column} IN ({placeholders})"
+                            sql_data = pd.read_sql_query(sql_query, engine, params=tuple(ids_to_fetch))
+                            log_operation(f"Fetched {len(sql_data)} specific rows from {table_name} based on new data IDs.", "success")
+                        else:
+                            log_operation(f"No valid IDs found in new data for {table_name}. Fetching empty structure.", "info")
+                            sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
                     else:
-                        # No valid IDs in new data, fetch empty structure from DB
-                        log_operation(f"No valid IDs found in new data for {table_name}. Fetching empty structure.", "info")
+                        log_operation(f"New data for {table_name} is empty or missing ID column '{id_column}'. Fetching empty structure.", "info")
                         sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
-                else:
-                    # New data is empty or ID column missing, fetch empty structure
-                    log_operation(f"New data for {table_name} is empty or missing ID column '{id_column}'. Fetching empty structure.", "info")
-                    sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
 
-                # Proceed with comparison and update
-                compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, new_data_df)
-                time.sleep(2) 
+                    if table_name == "dues":
+                        result = find_differences(sql_data, new_data_df, id_column, columns_to_check)
+
+                        if not result['rows_to_update'].empty or not result['rows_to_insert'].empty:
+                            main_ids_to_delete = []
+                            
+                            # Handle updates: get main_id from database using dues_id
+                            if not result['rows_to_update'].empty:
+                                dues_ids_to_update = result['rows_to_update']['dues_id'].tolist()
+                                placeholders = ', '.join(['%s'] * len(dues_ids_to_update))
+                                query = f"""
+                                    SELECT main_id FROM dues
+                                    WHERE dues_id IN ({placeholders})
+                                """
+                                cursor.execute(query, dues_ids_to_update)
+                                main_ids_from_updates = [row[0] for row in cursor.fetchall()]
+                                main_ids_to_delete.extend(main_ids_from_updates)
+                            
+                            # Handle inserts: get main_id directly from the dataframe
+                            if not result['rows_to_insert'].empty:
+                                if 'main_id' in result['rows_to_insert'].columns:
+                                    main_ids_from_inserts = result['rows_to_insert']['main_id'].dropna().tolist()
+                                    main_ids_to_delete.extend(main_ids_from_inserts)
+
+                            if main_ids_to_delete:
+                                main_ids_to_delete = list(set(main_ids_to_delete))
+                                
+                                placeholders = ', '.join(['%s'] * len(main_ids_to_delete))
+                                delete_query = f"""
+                                    DELETE FROM dues
+                                    WHERE main_id IN ({placeholders})
+                                """
+                                cursor.execute(delete_query, main_ids_to_delete)
+                                                                
+                                conn.commit()
+
+                            sql_data = pd.read_sql_query(f"SELECT * FROM {table_name} LIMIT 0", engine)
+
+                    
+                    try:            
+                        compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, new_data_df)
+                        
+                        if table_name == "dues":
+                            verification_query = f"SELECT COUNT(*) FROM {table_name} WHERE main_id IN ({', '.join(['%s'] * len(main_ids_to_delete))})"
+                            cursor.execute(verification_query, main_ids_to_delete)
+                            
+                    except Exception as update_error:
+                        log_operation(f"Error in compare_and_update_table for {table_name}.", "failed", str(update_error))
+                        raise
+                    
+                    time.sleep(2)
 
             except Exception as e:
                 log_error_report(e)
@@ -2118,54 +2160,6 @@ def main():
                     AND d.channel_id IS NULL
                     AND pi2.isgroupingproduct = false
                     AND p.channel_id IS NOT NULL;
-                    
-                    -- Update 6: Delete duplicates (dues)
-                    WITH ranked_duplicates AS (
-                        SELECT *,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY channel_id, value, duedate, netvalue, paymentdate
-                                ORDER BY registerdate DESC
-                            ) AS rn
-                        FROM dues
-                    )
-
-                    DELETE FROM dues
-                    WHERE dues_id IN (
-                        SELECT dues_id
-                        FROM ranked_duplicates
-                        WHERE rn > 1
-                    );
-                                
-                    DELETE FROM basket_teste;
-                               
-                    -- Update 7: Delete Old Dues
-                    WITH ranked_dues AS (
-                        SELECT *,
-                            ROW_NUMBER() OVER (PARTITION BY main_id ORDER BY registerdate DESC) AS rn
-                        FROM dues
-                        WHERE main_id IN (
-                            SELECT a.main_id
-                            FROM (
-                                SELECT main_id, SUM(netvalue) AS total_netvalue
-                                FROM dues
-                                GROUP BY main_id
-                            ) AS a
-                            JOIN deals AS b ON a.main_id = b.main_id
-                            WHERE (a.total_netvalue - b.netvalue) >= 1
-                            AND b.iswon = true
-                            AND b.netvalue <> 0
-                        )
-                    )
-                    DELETE FROM dues
-                    WHERE (main_id, registerdate) IN (
-                        SELECT main_id, registerdate
-                        FROM ranked_dues
-                        WHERE rn > 1  -- Only delete if there are older records
-                    );
-                    
-                    UPDATE public.pipeline
-                    SET title = 'CURITIBA II'
-                    WHERE pipeline_id = 2184;
                 """)
             log_operation("All dues updates completed in single transaction", "success")
 
