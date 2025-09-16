@@ -2116,6 +2116,10 @@ def main():
             # Start a single transaction
             with conn:
                 cursor.execute("""
+                    UPDATE public.pipeline
+                    SET title = 'CURITIBA II'
+                    WHERE pipeline_id = 2184;
+                    
                     -- Update 1: From displaylocations
                     UPDATE dues
                     SET channel_id = dl.channel_id
