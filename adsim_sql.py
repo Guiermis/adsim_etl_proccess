@@ -1864,8 +1864,10 @@ def main():
         activity_type = activity_type.replace({pd.NA : None})
         organization.loc[organization['isAgency'] == None, 'isAgency'] = False
         organization.loc[organization['municipalRegistration'] == None, 'municipalRegistration'] = False
+        organization.loc[organization['municipalRegistration'] != None, 'municipalRegistration'] = True
         organization.loc[organization['stateRegistration'] == None, 'stateRegistration'] = False
-
+        organization.loc[organization['stateRegistration'] != None, 'stateRegistration'] = True
+        
         dues.loc[dues['netValue'] == None, 'netValue'] = 0
         dues.loc[dues['value'] == None, 'value'] = 0   
 
