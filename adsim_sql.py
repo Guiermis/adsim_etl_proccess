@@ -972,7 +972,7 @@ def main():
             17296: 2184, 22678: 2184, 22748: 2184, 22749: 2184, 22751: 2184,
             23189: 2184, 23190: 2184, 23665: 2184, 24253: 2184, 24785: 2184,
             25427: 2184, 25583: 2184, 25798: 2184, 26658: 2184, 26793: 2184,
-            28125: 2184, 27404: 2184, 28982: 2184
+            28125: 2184, 27404: 2184, 28845: 2184
         }
         
         # Applying the pipeline splitting logic
@@ -2240,6 +2240,13 @@ def main():
             log_operation("Failed to update basket_teste!", "failed", str(e))
             log_error_report(e)
 
+        with conn:
+            cursor.execute("""
+                UPDATE public.pipeline
+                SET title = 'CURITIBA II'
+                WHERE pipeline_id = 2184;
+            """)
+            
         # Close connection
         cursor.close()
         conn.close()
