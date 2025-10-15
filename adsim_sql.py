@@ -887,6 +887,7 @@ def main():
         api_response = executor.map(extract_adsim_data, endpoints)
     
     dataframes = list(api_response)
+    dues_display_locations = pd.DataFrame(columns=['displayLocation_id', 'displayLocation_name', 'displayLocation_initials'])
         
     # Initialize Google Sheets client
     gc = None  # Initialize as None first
@@ -1223,6 +1224,36 @@ def main():
 
         dues = ensure_columns(dues, needed_columns['dues'], drop_extra_columns=False)
 
+        capture_columns = ['displayLocation_id', 'displayLocation_name', 'displayLocation_initials']
+        if set(capture_columns).issubset(dues.columns):
+            temp_display_locations = dues[capture_columns].copy()
+            temp_display_locations['displayLocation_id'] = pd.to_numeric(
+                temp_display_locations['displayLocation_id'], errors='coerce'
+            )
+            temp_display_locations = temp_display_locations.dropna(subset=['displayLocation_id'])
+            if not temp_display_locations.empty:
+                temp_display_locations['displayLocation_id'] = temp_display_locations['displayLocation_id'].astype('Int64')
+                temp_display_locations = temp_display_locations.drop_duplicates(subset=['displayLocation_id'])
+                dues_display_locations = pd.concat(
+                    [dues_display_locations, temp_display_locations],
+                    axis=0,
+                    ignore_index=True
+                )
+                dues_display_locations = dues_display_locations.dropna(subset=['displayLocation_id'])
+                dues_display_locations['displayLocation_id'] = pd.to_numeric(
+                    dues_display_locations['displayLocation_id'], errors='coerce'
+                ).astype('Int64')
+                dues_display_locations = dues_display_locations.drop_duplicates(subset=['displayLocation_id'])
+                log_operation(
+                    f"Captured {len(dues_display_locations)} display locations from dues payload.",
+                    "info"
+                )
+        else:
+            log_operation(
+                "Dues payload missing display location metadata columns; falling back to other sources.",
+                "warning"
+            )
+
         df = drop_columns(df, columns_to_drop=['dues'])
 
         dues = drop_columns(dues, columns_to_drop=['dealId', 'dues', 'product_name', 'product_tags', 'product_notes', 'product_value', 'product_endDate',
@@ -1501,7 +1532,43 @@ def main():
         for_cols = ['format_id', 'format_name', 'format_initials']
 
         channels = pd.concat([items[cha_cols], items_digital[cha_cols]], axis=0, ignore_index=True)
-        displayLocations = pd.concat([items[dis_cols], matriz_geotargets[dis_cols]], axis=0, ignore_index=True)
+
+        display_location_sources = [items[dis_cols], matriz_geotargets[dis_cols]]
+        if not dues_display_locations.empty:
+            if all(col in dues_display_locations.columns for col in dis_cols):
+                display_location_sources.append(dues_display_locations[dis_cols])
+                log_operation(
+                    f"Appended {len(dues_display_locations)} dues-derived display locations to the master list.",
+                    "info"
+                )
+            else:
+                missing_loc_cols = [col for col in dis_cols if col not in dues_display_locations.columns]
+                log_operation(
+                    "Skipped appending dues-derived display locations due to missing columns.",
+                    "warning",
+                    str(missing_loc_cols)
+                )
+
+        displayLocations = pd.concat(display_location_sources, axis=0, ignore_index=True)
+
+        if 'dues' in locals() and isinstance(dues, pd.DataFrame) and 'displayLocation_id' in dues.columns:
+            dues_ids_series = pd.to_numeric(dues['displayLocation_id'], errors='coerce')
+            dues_location_ids = [int(x) for x in dues_ids_series.dropna().astype('Int64').tolist()]
+            current_ids_series = pd.to_numeric(displayLocations['displayLocation_id'], errors='coerce')
+            current_ids = [int(x) for x in current_ids_series.dropna().astype('Int64').tolist()]
+            missing_ids = sorted(set(dues_location_ids) - set(current_ids))
+            if missing_ids:
+                placeholder_df = pd.DataFrame({
+                    'displayLocation_id': missing_ids,
+                    'displayLocation_name': [None] * len(missing_ids),
+                    'displayLocation_initials': [None] * len(missing_ids)
+                })
+                displayLocations = pd.concat([displayLocations, placeholder_df], axis=0, ignore_index=True)
+                log_operation(
+                    f"Added placeholder entries for {len(missing_ids)} display locations missing metadata.",
+                    "warning",
+                    f"IDs: {missing_ids}"
+                )
         products2 = pd.concat([items[prd_cols], items_digital[prd_cols]], axis=0, ignore_index=True)
         programs = items[['program_id', 'program_name', 'program_initials']].copy()
 
@@ -2080,7 +2147,9 @@ def main():
                                     main_ids_from_inserts = result['rows_to_insert']['main_id'].dropna().tolist()
                                     main_ids_to_delete.extend(main_ids_from_inserts)
 
-                            if main_ids_to_delete:
+                            if not main_ids_to_delete:
+                                pass
+                            else:
                                 main_ids_to_delete = list(set(main_ids_to_delete))
                                 
                                 placeholders = ', '.join(['%s'] * len(main_ids_to_delete))
@@ -2099,8 +2168,11 @@ def main():
                         compare_and_update_table(cursor, conn, table_name, id_column, columns_to_check, sql_data, new_data_df)
                         
                         if table_name == "dues":
-                            verification_query = f"SELECT COUNT(*) FROM {table_name} WHERE main_id IN ({', '.join(['%s'] * len(main_ids_to_delete))})"
-                            cursor.execute(verification_query, main_ids_to_delete)
+                            if not main_ids_to_delete:
+                                pass
+                            else:
+                                verification_query = f"SELECT COUNT(*) FROM {table_name} WHERE main_id IN ({', '.join(['%s'] * len(main_ids_to_delete))})"
+                                cursor.execute(verification_query, main_ids_to_delete)
                             
                     except Exception as update_error:
                         log_operation(f"Error in compare_and_update_table for {table_name}.", "failed", str(update_error))
